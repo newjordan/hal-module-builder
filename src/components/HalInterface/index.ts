@@ -1,1 +1,0 @@
-export { HalInterface } from './HalInterface';

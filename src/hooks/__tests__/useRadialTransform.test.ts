@@ -65,8 +65,10 @@ describe('useRadialTransform', () => {
     expect(radialConfig.arcMode).toBe(true);
     expect(radialConfig.invert).toBe(true);
 
+    // Partial arc (90°→180°, 4 items): step = 22.5°, centering offset = 11.25°,
+    // so index 1 → 90 + 11.25 + 22.5 = 123.75° (elements centered within the arc).
     const pos = transformPosition(1, 4);
-    expect(pos.angleDegrees).toBeCloseTo(112.5);
+    expect(pos.angleDegrees).toBeCloseTo(123.75);
     expect(pos.stepAngleDegrees).toBeGreaterThan(0);
 
     const vector = getVector(Math.PI / 2, 2);

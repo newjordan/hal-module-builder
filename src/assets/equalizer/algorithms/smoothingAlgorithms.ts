@@ -143,7 +143,11 @@ export function applyAttackReleaseSmoothing(
 
   for (let i = 0; i < currentData.length; i++) {
     const currentValue = currentData[i] || 0;
-    const previousValue = i < previousData.length ? previousData[i] || 0 : 0;
+    // When there is no previous frame for this index, fall back to the current
+    // value so the first frame passes through unattenuated instead of smoothing
+    // up from zero.
+    const previousValue =
+      i < previousData.length ? previousData[i] || 0 : currentData[i] || 0;
 
     if (currentValue > previousValue) {
       // Attack: faster response to increasing values

@@ -59,7 +59,6 @@ export class BarVisualization extends BaseVisualization {
   // E6.1 Audio Processing Modules
   private peakTrackingState: PeakTrackingState;
 
-  private lastInvert?: boolean;
 
   constructor(audioProcessor: any) {
     // Keep existing signature for compatibility
@@ -79,19 +78,6 @@ export class BarVisualization extends BaseVisualization {
   ): void {
     if (!context?.ctx || !frequencyData?.bands) {
       return;
-    }
-
-    // Debug: log invert changes reaching the visualization (logs only when value changes)
-    const invertNow = Boolean(
-      (config as any).invert ?? (config as any).invertDirection
-    );
-    if (this.lastInvert !== invertNow) {
-      console.debug('[BarVisualization] invert received', {
-        invert: invertNow,
-        alignment: (config as any).barAlignment,
-        layout: (config as any).layout,
-      });
-      this.lastInvert = invertNow;
     }
 
     const barConfig = config as BarVisualizationConfig;

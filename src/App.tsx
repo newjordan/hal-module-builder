@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { initializeEffectsLibrary } from './assets/effects';
 import ErrorBoundary from './components/ErrorBoundary';
-import { ApiKeyProvider } from './context/ApiKeyContext';
-import { ApiKeyModal } from './components/modals/ApiKeyModal';
 import {
   ModeProvider,
   useMode,
@@ -12,11 +10,6 @@ import {
   DesignMode,
 } from './modes';
 import { ImageStore } from './services/ImageStore';
-
-// Lazy load components to reduce initial bundle size
-const WidgetContainer = lazy(
-  () => import('./components/Widget/WidgetContainer')
-);
 
 // Default layers for present mode when no saved layers exist
 const DEFAULT_LAYERS = [
@@ -231,54 +224,21 @@ function App() {
         console.error('App Error Context:', error, errorInfo);
       }}
     >
-      <ApiKeyProvider>
-        <ModeProvider defaultMode='design'>
-          <Router>
-            <div className={theme}>
-              <Routes>
-                {/* Widget route - floating widget view */}
-                <Route
-                  path='/widget'
-                  element={
-                    <Suspense
-                      fallback={
-                        <div
-                          style={{
-                            width: '100vw',
-                            height: '100vh',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontSize: '12px',
-                          }}
-                        >
-                          Loading Widget...
-                        </div>
-                      }
-                    >
-                      <WidgetContainer />
-                    </Suspense>
-                  }
-                />
-
-                {/* Main app route - mode-based rendering */}
-                <Route
-                  path='/'
-                  element={
-                    <AppShell theme={theme} onThemeToggle={toggleTheme} />
-                  }
-                />
-              </Routes>
-
-              {/* API modal only in main app */}
-              <Routes>
-                <Route path='/' element={<ApiKeyModal theme={theme} />} />
-              </Routes>
-            </div>
-          </Router>
-        </ModeProvider>
-      </ApiKeyProvider>
+      <ModeProvider defaultMode='design'>
+        <Router>
+          <div className={theme}>
+            <Routes>
+              {/* Main app route - mode-based rendering */}
+              <Route
+                path='/'
+                element={
+                  <AppShell theme={theme} onThemeToggle={toggleTheme} />
+                }
+              />
+            </Routes>
+          </div>
+        </Router>
+      </ModeProvider>
     </ErrorBoundary>
   );
 }

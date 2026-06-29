@@ -413,6 +413,7 @@ describe('BarVisualization', () => {
         layout: 'radial',
         style: 'line',
         barWidth: 6,
+        barSpacing: 0, // no spacing → line thickness equals barWidth
         minHeight: 0,
       } as VisualizationConfig;
 

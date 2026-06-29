@@ -144,9 +144,11 @@ describe('smoothingAlgorithms', () => {
 
       const result = applyLinearSmoothing(inputData);
 
+      // window is ±1 and only defined values count: index 2 → [undef, 30, undef] = 30,
+      // index 4 → [undef, 50] = 50.
       expect(result[0]).toBeCloseTo(10);
-      expect(result[2]).toBeCloseTo(20); // (10+30)/2, skipping undefined
-      expect(result[4]).toBeCloseTo(40); // (30+50)/2
+      expect(result[2]).toBeCloseTo(30);
+      expect(result[4]).toBeCloseTo(50);
     });
   });
 
@@ -324,8 +326,9 @@ describe('smoothingAlgorithms', () => {
 
       const result = applyMedianFilter(inputData, 2);
 
+      // halfWindow=1 → windows: [1,2]→2, [1,2,3]→2, [2,3,4]→3, [3,4]→4
       expect(result).toHaveLength(4);
-      expect(result).toEqual(expect.arrayContaining([1, 2, 3, 4]));
+      expect(result).toEqual([2, 2, 3, 4]);
     });
 
     test('should validate window size', () => {

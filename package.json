@@ -3,15 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "electron": "electron electron/main.js",
-    "electron:dev": "NODE_ENV=development electron electron/main.js",
-    "electron:build": "npm run build && electron-builder",
-    "test-server": "node test-server.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -21,17 +16,14 @@
     "format:check": "prettier --check src",
     "type-check": "tsc --noEmit",
     "quality": "npm run type-check && npm run lint && npm run format:check",
-    "diagnose:gemini": "node scripts/diagnose-gemini-models.mjs",
     "prepare": "husky"
   },
   "dependencies": {
-    "@google/genai": "^1.20.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.9.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -42,8 +34,6 @@
     "@typescript-eslint/parser": "^8.41.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
-    "electron": "^38.1.2",
-    "electron-builder": "^26.0.12",
     "eslint": "^9.34.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
@@ -56,13 +46,11 @@
     "jest-canvas-mock": "^2.5.2",
     "jest-environment-jsdom": "^29.7.0",
     "lint-staged": "^16.1.6",
-    "playwright": "^1.58.2",
     "postcss": "^8.4.33",
     "prettier": "^3.6.2",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.1.1",
     "typescript": "^5.2.2",
-    "vite": "^5.0.8",
-    "ws": "^8.18.3"
+    "vite": "^5.0.8"
   }
 }

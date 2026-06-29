@@ -11,13 +11,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom'],
-          audio: ['./src/services/AudioService.ts'],
-          utils: [
-            './src/utils/ImageMemoryManager.ts',
-            './src/utils/PerformanceBaselines.ts',
-            './src/utils/performance-monitoring.ts'
-          ]
+          vendor: ['react', 'react-dom']
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]'
@@ -27,6 +21,6 @@ export default defineConfig({
     cssMinify: true
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', '@google/genai']
+    include: ['react', 'react-dom']
   }
 })

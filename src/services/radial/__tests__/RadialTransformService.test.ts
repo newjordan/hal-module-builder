@@ -60,7 +60,10 @@ describe('RadialTransformService', () => {
     );
   });
 
-  it('positions arc mode endpoints inclusively', () => {
+  it('centers elements within a partial arc with equal padding', () => {
+    // Partial arcs use N divisions and a half-step centering offset so elements
+    // are evenly distributed with equal padding on both ends (visual symmetry),
+    // rather than clamped exactly onto the start/end angles.
     const config: RadialConfig = {
       ...baseConfig,
       arcMode: true,
@@ -73,10 +76,15 @@ describe('RadialTransformService', () => {
       config
     );
 
+    // step = 180 / 5 = 36°, centering offset = 18° → 18, 54, 90, 126, 162
     expect(positions).toHaveLength(5);
-    expect(positions[0].angleDegrees).toBeCloseTo(0);
-    expect(positions[4].angleDegrees).toBeCloseTo(180);
+    expect(positions[0].angleDegrees).toBeCloseTo(18);
     expect(positions[2].angleDegrees).toBeCloseTo(90);
+    expect(positions[4].angleDegrees).toBeCloseTo(162);
+    // symmetric about the arc midpoint (90°)
+    expect(positions[0].angleDegrees + positions[4].angleDegrees).toBeCloseTo(
+      180
+    );
     expect(positions[1].angleDegrees + positions[3].angleDegrees).toBeCloseTo(
       180
     );

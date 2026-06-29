@@ -4,7 +4,6 @@ import {
   initializeGlobalLibrary,
 } from '../VisualizationLibrary';
 import { BarVisualization } from '../visualizations/BarVisualization';
-import { LineVisualization } from '../visualizations/LineVisualization';
 import { CircleVisualization } from '../visualizations/CircleVisualization';
 import { DotVisualization } from '../visualizations/DotVisualization';
 import { AudioAnalyzer } from '../processors/AudioAnalyzer';
@@ -49,9 +48,11 @@ describe('VisualizationFactory', () => {
       expect(viz).toBeInstanceOf(BarVisualization);
     });
 
-    it('should create line visualization', () => {
+    it('should create line visualization (handled by BarVisualization in line mode)', () => {
+      // 'line' and 'block' are registered to BarVisualization, which renders
+      // those modes via its style config rather than separate classes.
       const viz = VisualizationFactory.create('line', audioProcessor);
-      expect(viz).toBeInstanceOf(LineVisualization);
+      expect(viz).toBeInstanceOf(BarVisualization);
     });
 
     it('should create circle visualization', () => {

@@ -6,9 +6,10 @@
 
 **A browser-based, audio-reactive visual design tool.**
 
-Build layered visuals — shapes, gradients, images, radial text, and audio
-equalizers — and drive them in real time with audio. Design in the editor,
-then flip to a full-screen present mode.
+Build layered visuals — shapes, images, radial text, and audio equalizers —
+and drive them in real time with live audio. Design in the editor, then flip
+to a full-screen present mode. Its signature is the **radial graphics
+system**: radial text, radial symmetry, and circular audio visualizations.
 
 ![demo](public/loop_v1.gif)
 
@@ -18,25 +19,23 @@ then flip to a full-screen present mode.
 
 ## Features
 
-- **Layer-based editor** — compose visuals from shape, image, gradient,
-  radial-text, equalizer, effect, and generative asset layers.
-- **Audio reactivity** — map live audio to layer properties (intensity,
-  stroke width, brightness, hue shift, and more).
-- **Equalizer / visualizer** — configurable bar visualizations with multiple
-  endcap styles, color modes, and a radial-symmetry engine.
-- **Effects system** — blur, inner/outer glow, inner/outer shadow, stroke,
-  distortion, and pattern effects, plus a rich text-effects pipeline.
-- **Gradient system** — presets, multi-target application, and live CSS output.
-- **Generative assets** — optional image generation via Google Gemini.
-- **Text-to-speech** — optional voice generation via ElevenLabs.
-- **Design / Present modes** — a working editor and a distraction-free
-  full-screen presentation view, plus a floating widget route.
-- **Desktop build** — runs in the browser or as an Electron desktop app.
+- **Layer-based editor** — compose visuals from shape, image, radial-text, and
+  equalizer layers, each with transform, appearance, and effect controls.
+- **Live audio reactivity** — map microphone / system audio to layer properties
+  (scale, opacity, rotation, stroke width, brightness, hue shift, glow) with
+  per-mapping intensity, attack/release smoothing, and beat detection.
+- **Radial graphics** — radial text layout (arc mode, inner radius, orientation),
+  an n-fold radial symmetry engine, and circular/radial audio visualizations.
+- **Equalizer / visualizer** — bar, circle, dot, diamond, and hexagon
+  visualizations with configurable color modes, frequency range, and symmetry.
+- **Effects** — inner/outer glow and inner/outer shadow per layer.
+- **Design / Present modes** — a full editor and a distraction-free
+  full-screen presentation view.
 
 ## Tech stack
 
-React 18 · TypeScript · Vite · Canvas rendering · Jest + Testing Library ·
-Electron · Tailwind CSS
+React 18 · TypeScript · Vite · Canvas/Web Audio · Jest + Testing Library ·
+Tailwind CSS
 
 ## Getting started
 
@@ -54,24 +53,7 @@ npm run build
 npm run preview
 ```
 
-### Desktop (Electron)
-
-```bash
-npm run electron:dev    # run the desktop app against the dev build
-npm run electron:build  # package a distributable
-```
-
-## API keys
-
-The generative-asset and text-to-speech features call third-party APIs. **No
-keys are bundled with this repo.** You provide your own at runtime through the
-in-app API-key modal; keys are stored only in your browser's `localStorage` and
-are never committed:
-
-- **Google Gemini** — generative image/asset layers
-- **ElevenLabs** — text-to-speech voices
-
-These features are optional; the rest of the editor works without any keys.
+Allow microphone access when prompted to drive the visuals with live audio.
 
 ## Scripts
 
