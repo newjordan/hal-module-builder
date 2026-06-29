@@ -1,5 +1,15 @@
 import '@testing-library/jest-dom';
 import 'jest-canvas-mock';
+import { TextEncoder, TextDecoder } from 'util';
+
+// jsdom does not provide TextEncoder/TextDecoder, which react-router v7 needs.
+// Real browsers have these natively; polyfill them for the test environment.
+if (typeof (global as any).TextEncoder === 'undefined') {
+  (global as any).TextEncoder = TextEncoder;
+}
+if (typeof (global as any).TextDecoder === 'undefined') {
+  (global as any).TextDecoder = TextDecoder;
+}
 
 // Mock HTMLCanvasElement.getContext
 beforeEach(() => {
