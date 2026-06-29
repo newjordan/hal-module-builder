@@ -1,0 +1,388 @@
+/* HAL Module Builder - Frost Glass Integration */
+
+/* CSS Reset for key elements */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--frost-font-family);
+}
+
+/* Core layout structure */
+/* Ensure theme containers render the correct background gradient from frost_glass */
+.frost_light {
+  background: var(--frost-light-bg);
+  min-height: 100vh;
+}
+
+.frost_dark {
+  background: var(--frost-dark-bg);
+  min-height: 100vh;
+}
+
+.hal-demo {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  font-family: var(--frost-font-family);
+}
+/* Transparent HAL viewport */
+.hal-demo.frost_dark,
+.hal-demo.frost_light {
+  background: none;
+  overflow: visible;
+}
+
+.hal-demo.frost_dark::before,
+.hal-demo.frost_light::before {
+  display: none;
+}
+
+.hal-demo .main-canvas,
+.hal-demo .hal-composite-container {
+  background: transparent;
+}
+
+/* Main visualization area */
+.main-canvas {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: var(--frost-spacing-xl);
+}
+
+/* HAL centered container */
+.hal-center-container {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.hal-title {
+  font-size: 1.5rem;
+  font-weight: var(--frost-font-weight-light);
+  margin-bottom: var(--frost-spacing-2xl);
+  letter-spacing: var(--frost-letter-spacing-wide);
+}
+
+.hal-subtitle {
+  font-size: 0.9rem;
+  margin-top: var(--frost-spacing-2xl);
+  opacity: 0.8;
+}
+
+/* Ensure general text colors use Frost Glass typography classes */
+.hal-demo label {
+  /* Apply frost-text-primary class directly to elements */
+}
+
+.hal-demo h2,
+.hal-demo h3 {
+  /* Apply frost-text-primary class directly to elements */
+}
+
+.hal-demo p {
+  /* Apply frost-text-secondary class directly to elements */
+}
+
+/* Controls toggle button */
+.controls-toggle {
+  position: absolute;
+  top: var(--frost-spacing-xl);
+  right: var(--frost-spacing-xl);
+  z-index: 10;
+}
+
+/* Controls sidebar - extends theme-specific sidebar */
+.sidebar {
+  width: 400px;
+  min-width: 350px;
+  max-width: 60vw;
+  height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  position: relative;
+  resize: horizontal;
+  overflow-x: hidden;
+  padding-top: 60px; /* Space for theme button */
+}
+
+/* Resize handle */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 100%;
+  background: var(--current-border);
+  cursor: ew-resize;
+  z-index: var(--frost-z-modal);
+  transition: var(--frost-transition);
+  opacity: 0.6;
+  border-radius: 0 2px 2px 0;
+}
+
+.resize-handle:hover {
+  opacity: 1;
+  width: 10px;
+}
+
+.frost_light .resize-handle:hover {
+  background: rgba(20, 184, 166, 0.3);
+}
+
+.frost_dark .resize-handle:hover {
+  background: rgba(4, 75, 80, 0.3);
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 40px;
+  background: rgba(156, 163, 175, 0.8);
+  border-radius: var(--frost-radius-sm);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.resize-handle:hover::before {
+  background: rgba(156, 163, 175, 1);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+  height: 60px;
+}
+
+/* Sidebar typography */
+.sidebar h2 {
+  font-size: 1.25rem;
+  font-weight: var(--frost-font-weight-semibold);
+  margin-bottom: var(--frost-spacing-lg);
+}
+
+.sidebar h3 {
+  font-size: 1rem;
+  font-weight: var(--frost-font-weight-medium);
+  margin-bottom: var(--frost-spacing-md);
+}
+
+/* Control sections */
+.control-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border-radius: 12px;
+  min-width: 300px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.control-group {
+  margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ensure form elements don't overflow */
+.control-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.control-row > * {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.control-row .flex-1 {
+  flex: 1;
+  min-width: 80px;
+}
+
+/* Better spacing for layer items */
+.layer-item {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 300px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.layer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.layer-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.control-label {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+/* Form elements - Theme-aware input styles */
+.form-input,
+input[type='text'],
+input[type='number'],
+input[type='range'],
+select,
+textarea {
+  width: 100%;
+  padding: var(--frost-spacing-sm) var(--frost-spacing-md);
+  border: 1px solid var(--current-border);
+  border-radius: var(--frost-radius-md);
+  background: var(--current-bg-secondary);
+  /* Use frost-text-primary class directly on elements */
+  font-size: 0.875rem;
+  font-family: var(--frost-font-family);
+  box-sizing: border-box;
+  transition: var(--frost-transition);
+}
+
+.frost_light .form-input:focus,
+.frost_light input:focus,
+.frost_light select:focus,
+.frost_light textarea:focus {
+  outline: 2px solid rgba(20, 184, 166, 0.5);
+  outline-offset: 2px;
+  border-color: rgba(20, 184, 166, 0.5);
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.1);
+}
+
+.frost_dark .form-input:focus,
+.frost_dark input:focus,
+.frost_dark select:focus,
+.frost_dark textarea:focus {
+  outline: 2px solid rgba(4, 75, 80, 0.5);
+  outline-offset: 2px;
+  border-color: rgba(4, 75, 80, 0.5);
+  box-shadow: 0 0 0 2px rgba(4, 75, 80, 0.1);
+}
+
+/* Color inputs */
+input[type='color'] {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--current-border);
+  border-radius: var(--frost-radius-sm);
+  cursor: pointer;
+}
+
+/* Checkboxes */
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Layout utilities - Use frost_glass.css classes instead when possible */
+.control-row,
+.layer-header,
+.layer-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--frost-spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* Input field styling - works with frost_glass.css theme system */
+input[type='text'],
+input[type='number'],
+select,
+textarea {
+  padding: var(--frost-spacing-sm) var(--frost-spacing-md);
+  border-radius: var(--frost-radius-md);
+  font-family: var(--frost-font-family);
+  font-size: 0.875rem;
+  transition: var(--frost-transition);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .hal-demo {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: 50vh;
+  }
+
+  .main-canvas {
+    min-height: 50vh;
+  }
+
+  .hal-title {
+    font-size: 1.25rem;
+  }
+}
+
+/* Accessibility */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Layer item styling - Use frost-card classes instead when possible */
+.layer-item {
+  padding: var(--frost-spacing-md);
+  border-radius: var(--frost-radius-md);
+  margin-bottom: var(--frost-spacing-sm);
+  border: 1px solid var(--current-border);
+  background: var(--current-bg-secondary);
+}
+
+.frost_light .layer-item.selected {
+  border-color: rgba(20, 184, 166, 0.5);
+  background: rgba(20, 184, 166, 0.05);
+}
+
+.frost_dark .layer-item.selected {
+  border-color: rgba(4, 75, 80, 0.5);
+  background: rgba(4, 75, 80, 0.05);
+}
+
+.layer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--frost-spacing-sm);
+}
+
+.layer-controls {
+  display: flex;
+  gap: var(--frost-spacing-xs);
+}

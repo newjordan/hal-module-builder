@@ -1,0 +1,377 @@
+/**
+ * Frost Glass CSS - Complete Library
+ * ==================================
+ * 
+ * A comprehensive glassmorphism CSS library with dual theme support.
+ * Features frost_light and frost_dark themes with complete component sets.
+ * 
+ * @version 1.0.0
+ * @author Frosty40
+ * @license MIT
+ * @url https://github.com/frost-glass-css/frost-glass-css
+ */
+
+/* ================================
+ * CORE IMPORTS
+ * ================================ */
+
+@import url('../core/base.css');
+@import url('../core/utilities.css');
+
+/* ================================
+ * COMPONENT IMPORTS
+ * ================================ */
+
+@import url('../components/typography.css');
+@import url('../components/cards.css');
+@import url('../components/navigation.css');
+@import url('../components/buttons.css');
+
+/* ================================
+ * EFFECTS IMPORTS
+ * ================================ */
+
+@import url('../effects/animations.css');
+
+/* ================================
+ * THEME IMPORTS
+ * ================================ */
+
+@import url('./frost-light.css');
+@import url('./frost-dark.css');
+
+/* ================================
+ * LIBRARY INFORMATION
+ * ================================ */
+
+/*! 
+ * Frost Glass CSS v1.0.0
+ * 
+ * A modern glassmorphism CSS library featuring:
+ * - Dual theme support (light & dark)
+ * - Comprehensive component library
+ * - CSS custom properties for easy theming
+ * - Accessibility features built-in
+ * - Browser compatibility with fallbacks
+ * - Responsive design patterns
+ * 
+ * Components included:
+ * - Cards & content areas
+ * - Navigation & sidebars  
+ * - Buttons & form controls
+ * - Typography & text utilities
+ * - Layout & spacing utilities
+ * - Animation & transition effects
+ * 
+ * Browser support:
+ * - Chrome 76+
+ * - Firefox 72+
+ * - Safari 13+
+ * - Edge 79+
+ * 
+ * Accessibility features:
+ * - Reduced motion support
+ * - High contrast mode support
+ * - Focus indicators
+ * - Screen reader utilities
+ * 
+ * Installation:
+ * <link rel="stylesheet" href="frost-glass.css">
+ * 
+ * Usage:
+ * <div class="frost_light frost-card">Light theme card</div>
+ * <div class="frost_dark frost-card">Dark theme card</div>
+ * 
+ * For more information visit:
+ * https://github.com/frost-glass-css/frost-glass-css
+ */
+
+/* ================================
+ * USAGE EXAMPLES - FORMS & INPUTS
+ * ================================ */
+
+/*
+DROPDOWN/SELECT EXAMPLES:
+========================
+
+Light Theme:
+<!-- Basic Select -->
+<div class="demo-input-group">
+    <label class="text-label">Choose Option</label>
+    <div class="frostlight-input-container">
+        <select class="frostlight-input-field">
+            <option value="">Select...</option>
+            <option value="opt1">Option 1</option>
+            <option value="opt2">Option 2</option>
+            <option value="opt3">Option 3</option>
+        </select>
+    </div>
+</div>
+
+Dark Theme:
+<!-- Basic Select -->
+<div class="demo-input-group">
+    <label class="text-label">Choose Option</label>
+    <div class="frostdark-input-container">
+        <select class="frostdark-input-field">
+            <option value="">Select...</option>
+            <option value="opt1">Option 1</option>
+            <option value="opt2">Option 2</option>
+            <option value="opt3">Option 3</option>
+        </select>
+    </div>
+</div>
+
+SLIDER/RANGE EXAMPLES:
+=====================
+
+Light Theme:
+<!-- Range Slider -->
+<div class="demo-input-group">
+    <label class="text-label">Volume: <span id="volume-display">50</span>%</label>
+    <div class="frostlight-input-container">
+        <input 
+            type="range" 
+            class="frostlight-slider" 
+            min="0" 
+            max="100" 
+            value="50"
+            oninput="document.getElementById('volume-display').textContent = this.value"
+        >
+    </div>
+</div>
+
+<!-- Color Range -->
+<div class="demo-input-group">
+    <label class="text-label">Opacity: <span id="opacity-display">75</span>%</label>
+    <input 
+        type="range" 
+        class="frostlight-slider" 
+        min="0" 
+        max="100" 
+        value="75"
+        oninput="document.getElementById('opacity-display').textContent = this.value"
+    >
+</div>
+
+Dark Theme:
+<!-- Range Slider -->
+<div class="demo-input-group">
+    <label class="text-label">Volume: <span id="volume-display-dark">50</span>%</label>
+    <div class="frostdark-input-container">
+        <input 
+            type="range" 
+            class="frostdark-slider" 
+            min="0" 
+            max="100" 
+            value="50"
+            oninput="document.getElementById('volume-display-dark').textContent = this.value"
+        >
+    </div>
+</div>
+
+<!-- Color Range -->
+<div class="demo-input-group">
+    <label class="text-label">Opacity: <span id="opacity-display-dark">75</span>%</label>
+    <input 
+        type="range" 
+        class="frostdark-slider" 
+        min="0" 
+        max="100" 
+        value="75"
+        oninput="document.getElementById('opacity-display-dark').textContent = this.value"
+    >
+</div>
+
+COMPLETE FORM EXAMPLES:
+======================
+
+Light Theme Form:
+<form class="frost_light" style="max-width: 400px; padding: 2rem;">
+    <!-- Text Input -->
+    <div class="demo-input-group">
+        <label class="text-label">Full Name</label>
+        <div class="frostlight-input-container">
+            <input type="text" class="frostlight-input-field" placeholder="Enter your name...">
+        </div>
+    </div>
+
+    <!-- Email Input -->
+    <div class="demo-input-group">
+        <label class="text-label">Email Address</label>
+        <div class="frostlight-input-container">
+            <input type="email" class="frostlight-input-field" placeholder="you@example.com">
+        </div>
+    </div>
+
+    <!-- Select Dropdown -->
+    <div class="demo-input-group">
+        <label class="text-label">Country</label>
+        <div class="frostlight-input-container">
+            <select class="frostlight-input-field">
+                <option value="">Select Country...</option>
+                <option value="us">United States</option>
+                <option value="uk">United Kingdom</option>
+                <option value="ca">Canada</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Range Slider -->
+    <div class="demo-input-group">
+        <label class="text-label">Experience Level</label>
+        <input type="range" class="frostlight-slider" min="1" max="10" value="5">
+    </div>
+
+    <!-- Color Picker -->
+    <div class="demo-input-group">
+        <label class="text-label">Favorite Color</label>
+        <input type="color" class="frostlight-color-input" value="#14b8a6">
+    </div>
+
+    <!-- Checkbox -->
+    <div class="demo-input-group">
+        <label class="frost-flex frost-items-center frost-gap-2">
+            <input type="checkbox" class="frostlight-checkbox">
+            <span class="text-label">Subscribe to newsletter</span>
+        </label>
+    </div>
+
+    <!-- Textarea -->
+    <div class="demo-input-group">
+        <label class="text-label">Message</label>
+        <div class="frostlight-conv-input-container">
+            <textarea class="frostlight-conv-input" rows="3" placeholder="Your message..."></textarea>
+        </div>
+    </div>
+
+    <!-- Submit Button -->
+    <button type="submit" class="frostlight-button-action frost-w-full">Submit Form</button>
+</form>
+
+Dark Theme Form:
+<form class="frost_dark" style="max-width: 400px; padding: 2rem;">
+    <!-- Text Input -->
+    <div class="demo-input-group">
+        <label class="text-label">Full Name</label>
+        <div class="frostdark-input-container">
+            <input type="text" class="frostdark-input-field" placeholder="Enter your name...">
+        </div>
+    </div>
+
+    <!-- Email Input -->
+    <div class="demo-input-group">
+        <label class="text-label">Email Address</label>
+        <div class="frostdark-input-container">
+            <input type="email" class="frostdark-input-field" placeholder="you@example.com">
+        </div>
+    </div>
+
+    <!-- Select Dropdown -->
+    <div class="demo-input-group">
+        <label class="text-label">Country</label>
+        <div class="frostdark-input-container">
+            <select class="frostdark-input-field">
+                <option value="">Select Country...</option>
+                <option value="us">United States</option>
+                <option value="uk">United Kingdom</option>
+                <option value="ca">Canada</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Range Slider -->
+    <div class="demo-input-group">
+        <label class="text-label">Experience Level</label>
+        <input type="range" class="frostdark-slider" min="1" max="10" value="5">
+    </div>
+
+    <!-- Color Picker -->
+    <div class="demo-input-group">
+        <label class="text-label">Favorite Color</label>
+        <input type="color" class="frostdark-color-input" value="#044b50">
+    </div>
+
+    <!-- Checkbox -->
+    <div class="demo-input-group">
+        <label class="frost-flex frost-items-center frost-gap-2">
+            <input type="checkbox" class="frostdark-checkbox">
+            <span class="text-label">Subscribe to newsletter</span>
+        </label>
+    </div>
+
+    <!-- Textarea -->
+    <div class="demo-input-group">
+        <label class="text-label">Message</label>
+        <div class="frostdark-conv-input-container">
+            <textarea class="frostdark-conv-input" rows="3" placeholder="Your message..."></textarea>
+        </div>
+    </div>
+
+    <!-- Submit Button -->
+    <button type="submit" class="frostdark-button-action frost-w-full">Submit Form</button>
+</form>
+
+BUTTON VARIATIONS:
+==================
+
+Light Theme Buttons:
+<button class="frostlight-button-action">Primary Button</button>
+<button class="frostlight-button-action frostlight-button-action-sm">Small Button</button>
+<button class="frostlight-button-action-danger">Danger Button</button>
+<button class="frostlight-button-action-danger frostlight-button-action-sm">Small Danger</button>
+
+Dark Theme Buttons:
+<button class="frostdark-button-action">Primary Button</button>
+<button class="frostdark-button-action frostdark-button-action-sm">Small Button</button>
+<button class="frostdark-button-action-danger">Danger Button</button>
+<button class="frostdark-button-action-danger frostdark-button-action-sm">Small Danger</button>
+
+ADVANCED INPUT COMBINATIONS:
+============================
+
+Search with Icon:
+<!-- Light Theme -->
+<div class="frostlight-input-container">
+    <input type="text" class="frostlight-input-field" placeholder="Search...">
+    <span class="text-accent" style="margin-left: 0.75rem; font-size: 1.1rem;">🔍</span>
+</div>
+
+<!-- Dark Theme -->
+<div class="frostdark-input-container">
+    <input type="text" class="frostdark-input-field" placeholder="Search...">
+    <span class="text-accent" style="margin-left: 0.75rem; font-size: 1.1rem;">🔍</span>
+</div>
+
+Input with Button:
+<!-- Light Theme -->
+<div class="frost-flex frost-gap-2">
+    <div class="frostlight-input-container frost-flex-1">
+        <input type="email" class="frostlight-input-field" placeholder="Newsletter signup...">
+    </div>
+    <button class="frostlight-button-action">Subscribe</button>
+</div>
+
+<!-- Dark Theme -->
+<div class="frost-flex frost-gap-2">
+    <div class="frostdark-input-container frost-flex-1">
+        <input type="email" class="frostdark-input-field" placeholder="Newsletter signup...">
+    </div>
+    <button class="frostdark-button-action">Subscribe</button>
+</div>
+
+MESSAGE INPUT WITH SEND:
+========================
+
+Light Theme:
+<div class="frostlight-conv-input-container">
+    <textarea class="frostlight-conv-input" placeholder="Type your message..." rows="2"></textarea>
+    <button class="frostlight-conv-send-btn">→</button>
+</div>
+
+Dark Theme:
+<div class="frostdark-conv-input-container">
+    <textarea class="frostdark-conv-input" placeholder="Type your message..." rows="2"></textarea>
+    <button class="frostdark-conv-send-btn">→</button>
+</div>
+*/

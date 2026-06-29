@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/newjordan/hal-module-builder/discussions
+    about: Ask questions, share ideas, or discuss the project with the community
+  - name: Documentation
+    url: https://github.com/newjordan/hal-module-builder/tree/master/docs
+    about: Browse the technical documentation in the docs/ directory

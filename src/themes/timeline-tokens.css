@@ -1,0 +1,69 @@
+/* Timeline Tokens - Frost Glass integration */
+
+/* Match project theme containers */
+.frost_light {
+  /* Surfaces */
+  --timeline-surface-panel: rgba(255, 255, 255, 0.7);
+  --timeline-surface-ruler: rgba(240, 245, 255, 0.75);
+  --timeline-surface-track-even: rgba(255, 255, 255, 0.6);
+  --timeline-surface-track-odd: rgba(255, 255, 255, 0.52);
+  --timeline-surface-lane: transparent;
+
+  /* Text */
+  --timeline-text-primary: var(--current-text-primary);
+  --timeline-text-muted: var(--current-text-muted);
+  --timeline-text-inverse: #ffffff;
+
+  /* Borders */
+  --timeline-border-strong: color-mix(in oklab, var(--current-border-active), transparent 10%);
+  --timeline-border-subtle: color-mix(in oklab, var(--current-border), transparent 40%);
+  --timeline-grid-line: color-mix(in oklab, var(--current-border), transparent 55%);
+
+  /* Accents */
+  --timeline-accent-primary: rgb(59, 130, 246);
+  --timeline-accent-contrast: #ffffff;
+  --timeline-playhead: var(--timeline-accent-primary);
+  --timeline-selection-fill: color-mix(in oklab, var(--timeline-accent-primary), transparent 78%);
+  --timeline-keyframe-fill: var(--timeline-accent-primary);
+  --timeline-keyframe-stroke: var(--timeline-border-strong);
+
+  /* States */
+  --timeline-hover-surface: color-mix(in oklab, var(--timeline-surface-panel), white 8%);
+  --timeline-active-surface: color-mix(in oklab, var(--timeline-accent-primary), transparent 85%);
+  --timeline-selected-surface: color-mix(in oklab, var(--timeline-accent-primary), transparent 88%);
+  --timeline-disabled-opacity: 0.45;
+}
+
+.frost_dark {
+  /* Surfaces */
+  --timeline-surface-panel: rgba(18, 18, 18, 0.82);
+  --timeline-surface-ruler: rgba(30, 30, 30, 0.88);
+  --timeline-surface-track-even: rgba(28, 28, 28, 0.84);
+  --timeline-surface-track-odd: rgba(24, 24, 24, 0.84);
+  --timeline-surface-lane: transparent;
+
+  /* Text */
+  --timeline-text-primary: var(--current-text-primary);
+  --timeline-text-muted: var(--current-text-muted);
+  --timeline-text-inverse: #ffffff;
+
+  /* Borders */
+  --timeline-border-strong: rgba(255, 255, 255, 0.16);
+  --timeline-border-subtle: rgba(255, 255, 255, 0.08);
+  --timeline-grid-line: rgba(255, 255, 255, 0.06);
+
+  /* Accents */
+  --timeline-accent-primary: rgb(59, 130, 246);
+  --timeline-accent-contrast: #ffffff;
+  --timeline-playhead: var(--timeline-accent-primary);
+  --timeline-selection-fill: color-mix(in oklab, var(--timeline-accent-primary), transparent 82%);
+  --timeline-keyframe-fill: var(--timeline-accent-primary);
+  --timeline-keyframe-stroke: var(--timeline-border-strong);
+
+  /* States */
+  --timeline-hover-surface: color-mix(in oklab, var(--timeline-surface-panel), white 6%);
+  --timeline-active-surface: color-mix(in oklab, var(--timeline-surface-panel), white 10%);
+  --timeline-selected-surface: color-mix(in oklab, var(--timeline-accent-primary), transparent 86%);
+  --timeline-disabled-opacity: 0.45;
+}
+

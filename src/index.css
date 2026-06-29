@@ -1,0 +1,90 @@
+/* Import Frost Glass CSS Library - Using distributed version */
+@import url('./themes/frost-glass.css');
+@import url('./themes/timeline-tokens.css');
+
+
+/* Import layout fixes */
+@import url('./layout-fixes.css');
+
+/* Global Typography and Theme Transitions */
+body {
+  font-family: var(--current-font-family);
+
+  /* Comprehensive theme switching transitions - prevent flicker */
+  transition:
+    background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Removed global transform/will-change to preserve position: fixed semantics */
+
+  /* Prevent layout shifts during theme changes */
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Universal theme transition for all Frost Glass components */
+[class*='frostlight-'],
+[class*='frostdark-'] {
+  transition:
+    background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    backdrop-filter 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Ensure smooth rendering during transitions */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Prevent flicker on theme container changes */
+.frost_light,
+.frost_dark {
+  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Removed transform to avoid creating a stacking context that breaks fixed */
+  backface-visibility: hidden;
+}
+
+/* Enhanced transition state during theme switching */
+body.theme-transitioning * {
+  transition-duration: 0.3s !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Prevent CSS custom property inheritance flicker */
+body.theme-transitioning [class*='frostlight-'],
+body.theme-transitioning [class*='frostdark-'] {
+  will-change: background, color, border-color, backdrop-filter;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Modal Styles */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}

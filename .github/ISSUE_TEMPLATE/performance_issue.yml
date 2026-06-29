@@ -1,0 +1,156 @@
+name: Performance Issue
+description: Report performance degradation, memory leaks, or optimization opportunities
+title: "[Performance]: "
+labels: ["performance", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a performance issue! Performance is critical to HAL Builder's mission of maintaining 60fps with 20+ layers. Please provide as much detail as possible.
+
+  - type: dropdown
+    id: perf-type
+    attributes:
+      label: Performance Issue Type
+      description: What type of performance issue is this?
+      options:
+        - Frame Rate Drop (Below 60fps)
+        - Memory Leak (Increasing memory over time)
+        - Slow Load Time (Application takes too long to start)
+        - UI Lag / Freezing (Unresponsive interface)
+        - Large Bundle Size (Excessive download size)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: Describe the performance problem in detail
+      placeholder: When adding more than 10 audio layers, frame rate drops to 30fps...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the performance issue
+      placeholder: |
+        1. Create a new project
+        2. Add 15 audio visualizer layers
+        3. Play audio and observe frame rate
+        4. FPS drops from 60 to 30
+    validations:
+      required: true
+
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Performance Metrics
+      description: Actual measurements (frame rate, memory usage, load time, etc.)
+      value: |
+        **Before (Expected):**
+        - Frame Rate: 60 FPS
+        - Memory Usage: < 100MB
+        - CPU Usage: < 50%
+
+        **After (Actual):**
+        - Frame Rate: [e.g., 30 FPS]
+        - Memory Usage: [e.g., 250MB]
+        - CPU Usage: [e.g., 85%]
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: profiling
+    attributes:
+      label: Profiling Data
+      description: Chrome DevTools Performance profile, memory snapshots, or other profiling data
+      placeholder: |
+        Attach performance profiles, flamegraphs, or memory heap snapshots here.
+        You can use Chrome DevTools > Performance tab to record a profile.
+
+  - type: dropdown
+    id: layer-count
+    attributes:
+      label: Layer Count
+      description: How many layers were active when the issue occurred?
+      options:
+        - 1-5 layers
+        - 6-10 layers
+        - 11-15 layers
+        - 16-20 layers
+        - 20+ layers
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Performance Impact
+      description: How severe is the performance degradation?
+      options:
+        - Critical (Application unusable)
+        - High (Major workflow disruption)
+        - Medium (Noticeable slowdown)
+        - Low (Minor impact)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your system and runtime environment
+      value: |
+        - **OS**: [e.g., Windows 11, macOS 14]
+        - **Browser**: [e.g., Chrome 120 (include version)]
+        - **HAL Builder Version**: [e.g., 1.5.0]
+        - **CPU**: [e.g., Intel i7-12700K, M2 Pro]
+        - **RAM**: [e.g., 16GB, 32GB]
+        - **GPU**: [e.g., NVIDIA RTX 3060, integrated]
+        - **Hardware Acceleration**: [Enabled / Disabled]
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: regression
+    attributes:
+      label: Regression Information
+      description: Did this work better in a previous version?
+      placeholder: This worked fine in version 1.4.5, started happening in 1.5.0...
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround
+      description: Have you found any temporary workarounds?
+      placeholder: Reducing layer count to 10 or less maintains 60fps...
+
+  - type: textarea
+    id: optimization-ideas
+    attributes:
+      label: Optimization Ideas
+      description: Any ideas on what might be causing this or how to fix it?
+      placeholder: |
+        I suspect the issue is in the render loop - it seems to be recalculating transforms on every frame even when layers haven't moved...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have provided actual performance measurements
+          required: true
+        - label: I can reproduce this issue consistently
+          required: true
+        - label: I have tested with hardware acceleration enabled
+          required: false

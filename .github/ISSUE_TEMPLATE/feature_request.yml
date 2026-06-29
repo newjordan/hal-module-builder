@@ -1,0 +1,128 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for HAL Builder
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please fill out the sections below to help us understand your idea.
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What type of feature is this?
+      options:
+        - New Layer Type (e.g., particle system, 3D object)
+        - Audio Processing (e.g., new visualizer, audio effects)
+        - UI/UX Enhancement (e.g., better controls, workflow improvements)
+        - Performance Optimization (e.g., faster rendering, lower memory)
+        - Developer Experience (e.g., better APIs, documentation)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? Who benefits from it?
+      placeholder: As a user creating audio visualizations, I often need to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How would you like this feature to work?
+      placeholder: |
+        I propose adding a new "Particle Layer" that:
+        1. Generates particles based on audio frequency
+        2. Allows customization of particle size, color, and velocity
+        3. Maintains 60fps performance with up to 1000 particles
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other solutions or workarounds have you considered?
+      placeholder: I tried using multiple circle layers, but it's too slow...
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical (Blocking my work)
+        - High (Would greatly improve my workflow)
+        - Medium (Nice to have)
+        - Low (Minor improvement)
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-stories
+    attributes:
+      label: User Stories
+      description: Describe specific use cases for this feature
+      placeholder: |
+        - As a VJ, I want to create particle effects that react to bass frequencies
+        - As a music producer, I want to export particle animations for my music videos
+      render: markdown
+
+  - type: textarea
+    id: technical-details
+    attributes:
+      label: Technical Considerations
+      description: Any technical details, API design ideas, or implementation thoughts?
+      placeholder: |
+        This could use the Web Workers API for particle calculations to avoid blocking the UI thread...
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups / Examples
+      description: Visual mockups, screenshots, or links to similar features in other apps
+      placeholder: Drag and drop images here or paste URLs to examples...
+
+  - type: checkboxes
+    id: requirements
+    attributes:
+      label: Feature Requirements
+      description: Select all that apply
+      options:
+        - label: This feature should work in both light and dark themes
+          required: false
+        - label: This feature must maintain 60fps performance
+          required: false
+        - label: This feature needs to be keyboard accessible
+          required: false
+        - label: This feature should be compatible with template export/import
+          required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to contribute this feature
+          required: false
+        - label: I would be willing to test this feature
+          required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have provided a clear problem statement and solution
+          required: true
