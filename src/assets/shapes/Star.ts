@@ -148,7 +148,7 @@ export class StarShape extends BaseShape<StarProperties> {
     const innerRadius = shapeSpecific?.innerRadius ?? props.innerRadius ?? 25;
 
     // Calculate the total size needed for the canvas
-    const totalSize = (outerRadius * 2) + (strokeWidth * 2);
+    const totalSize = outerRadius * 2 + strokeWidth * 2;
     const center = totalSize / 2;
 
     const angleStep = (Math.PI * 2) / (points * 2);

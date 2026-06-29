@@ -137,8 +137,8 @@ export class RectangleShape extends BaseShape<RectangleProperties> {
     const cornerRadius = shapeSpecific?.cornerRadius ?? props.cornerRadius ?? 0;
 
     // Calculate the total size needed for the canvas
-    const totalWidth = width + (strokeWidth * 2);
-    const totalHeight = height + (strokeWidth * 2);
+    const totalWidth = width + strokeWidth * 2;
+    const totalHeight = height + strokeWidth * 2;
 
     return React.createElement(
       'svg',

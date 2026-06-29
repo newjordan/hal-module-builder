@@ -143,7 +143,13 @@ export interface RadialTextEffects {
 
   // === EXISTING EFFECT INTEGRATION ===
   /** Color mode from existing ColorSettings */
-  colorMode: 'solid' | 'gradient' | 'rainbow' | 'reactive' | 'custom-gradient' | 'radial-gradient';
+  colorMode:
+    | 'solid'
+    | 'gradient'
+    | 'rainbow'
+    | 'reactive'
+    | 'custom-gradient'
+    | 'radial-gradient';
   /** Primary text color */
   primaryColor: string;
   /** Secondary color for gradients (optional) */

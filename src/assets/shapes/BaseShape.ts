@@ -426,7 +426,15 @@ export abstract class BaseShape<T extends ShapeProperties = ShapeProperties>
     id: string,
     _type: 'fill' | 'stroke'
   ): React.ReactElement {
-    const { type: gradientType, colors, stops, angle, centerX, centerY, spreadMethod } = gradient;
+    const {
+      type: gradientType,
+      colors,
+      stops,
+      angle,
+      centerX,
+      centerY,
+      spreadMethod,
+    } = gradient;
     const spread = spreadMethod || 'pad';
 
     if (gradientType === 'linear') {

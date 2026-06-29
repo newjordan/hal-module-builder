@@ -89,7 +89,9 @@ function ModeRouter({
         );
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [layerMetadata]);
 
   switch (mode) {
@@ -231,9 +233,7 @@ function App() {
               {/* Main app route - mode-based rendering */}
               <Route
                 path='/'
-                element={
-                  <AppShell theme={theme} onThemeToggle={toggleTheme} />
-                }
+                element={<AppShell theme={theme} onThemeToggle={toggleTheme} />}
               />
             </Routes>
           </div>

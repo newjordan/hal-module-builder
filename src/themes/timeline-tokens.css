@@ -15,22 +15,50 @@
   --timeline-text-inverse: #ffffff;
 
   /* Borders */
-  --timeline-border-strong: color-mix(in oklab, var(--current-border-active), transparent 10%);
-  --timeline-border-subtle: color-mix(in oklab, var(--current-border), transparent 40%);
-  --timeline-grid-line: color-mix(in oklab, var(--current-border), transparent 55%);
+  --timeline-border-strong: color-mix(
+    in oklab,
+    var(--current-border-active),
+    transparent 10%
+  );
+  --timeline-border-subtle: color-mix(
+    in oklab,
+    var(--current-border),
+    transparent 40%
+  );
+  --timeline-grid-line: color-mix(
+    in oklab,
+    var(--current-border),
+    transparent 55%
+  );
 
   /* Accents */
   --timeline-accent-primary: rgb(59, 130, 246);
   --timeline-accent-contrast: #ffffff;
   --timeline-playhead: var(--timeline-accent-primary);
-  --timeline-selection-fill: color-mix(in oklab, var(--timeline-accent-primary), transparent 78%);
+  --timeline-selection-fill: color-mix(
+    in oklab,
+    var(--timeline-accent-primary),
+    transparent 78%
+  );
   --timeline-keyframe-fill: var(--timeline-accent-primary);
   --timeline-keyframe-stroke: var(--timeline-border-strong);
 
   /* States */
-  --timeline-hover-surface: color-mix(in oklab, var(--timeline-surface-panel), white 8%);
-  --timeline-active-surface: color-mix(in oklab, var(--timeline-accent-primary), transparent 85%);
-  --timeline-selected-surface: color-mix(in oklab, var(--timeline-accent-primary), transparent 88%);
+  --timeline-hover-surface: color-mix(
+    in oklab,
+    var(--timeline-surface-panel),
+    white 8%
+  );
+  --timeline-active-surface: color-mix(
+    in oklab,
+    var(--timeline-accent-primary),
+    transparent 85%
+  );
+  --timeline-selected-surface: color-mix(
+    in oklab,
+    var(--timeline-accent-primary),
+    transparent 88%
+  );
   --timeline-disabled-opacity: 0.45;
 }
 
@@ -56,14 +84,29 @@
   --timeline-accent-primary: rgb(59, 130, 246);
   --timeline-accent-contrast: #ffffff;
   --timeline-playhead: var(--timeline-accent-primary);
-  --timeline-selection-fill: color-mix(in oklab, var(--timeline-accent-primary), transparent 82%);
+  --timeline-selection-fill: color-mix(
+    in oklab,
+    var(--timeline-accent-primary),
+    transparent 82%
+  );
   --timeline-keyframe-fill: var(--timeline-accent-primary);
   --timeline-keyframe-stroke: var(--timeline-border-strong);
 
   /* States */
-  --timeline-hover-surface: color-mix(in oklab, var(--timeline-surface-panel), white 6%);
-  --timeline-active-surface: color-mix(in oklab, var(--timeline-surface-panel), white 10%);
-  --timeline-selected-surface: color-mix(in oklab, var(--timeline-accent-primary), transparent 86%);
+  --timeline-hover-surface: color-mix(
+    in oklab,
+    var(--timeline-surface-panel),
+    white 6%
+  );
+  --timeline-active-surface: color-mix(
+    in oklab,
+    var(--timeline-surface-panel),
+    white 10%
+  );
+  --timeline-selected-surface: color-mix(
+    in oklab,
+    var(--timeline-accent-primary),
+    transparent 86%
+  );
   --timeline-disabled-opacity: 0.45;
 }
-

@@ -34,7 +34,9 @@ export interface ShapeRendererProps {
  * This gives the HAL a default "alive/talking" effect driven by audio volume,
  * so it animates out of the box when TTS plays.
  */
-function withImplicitReactivity(layer: ShapeRendererProps['layer']): ShapeRendererProps['layer'] {
+function withImplicitReactivity(
+  layer: ShapeRendererProps['layer']
+): ShapeRendererProps['layer'] {
   if (layer.audioReactive?.enabled) return layer; // already configured
   return {
     ...layer,
@@ -42,9 +44,19 @@ function withImplicitReactivity(layer: ShapeRendererProps['layer']): ShapeRender
       enabled: true,
       mappings: [
         // Subtle scale pulse driven by mid frequencies (speech band)
-        { audioFeature: 'mid', targetProperty: 'scale', intensity: 0.4, smoothing: 0.6 },
+        {
+          audioFeature: 'mid',
+          targetProperty: 'scale',
+          intensity: 0.4,
+          smoothing: 0.6,
+        },
         // Gentle glow pulse on volume
-        { audioFeature: 'volume', targetProperty: 'glowIntensity', intensity: 0.5, smoothing: 0.65 },
+        {
+          audioFeature: 'volume',
+          targetProperty: 'glowIntensity',
+          intensity: 0.5,
+          smoothing: 0.65,
+        },
       ],
     },
   } as ShapeRendererProps['layer'];
@@ -58,7 +70,7 @@ function withImplicitReactivity(layer: ShapeRendererProps['layer']): ShapeRender
 function useSyntheticSpeakingPulse(
   isSpeaking: boolean,
   _animationFrame: number,
-  baseScale: number,
+  baseScale: number
 ): { scale?: number; glowIntensity?: number } | null {
   // Track phase so the animation is continuous, not tied to animationFrame directly
   const phaseRef = useRef(0);
@@ -74,13 +86,13 @@ function useSyntheticSpeakingPulse(
 
   // Composite wave: slow breathing + faster syllable rhythm + jitter
   // Mimics natural speech cadence (~3-5 syllables/sec)
-  const breath = 0.3 * Math.sin(t * 0.4);        // slow ~0.5Hz breathing
-  const syllable = 0.5 * Math.sin(t * 2.8);       // ~4Hz syllable rhythm
-  const jitter = 0.2 * Math.sin(t * 7.1);         // fast micro-variation
+  const breath = 0.3 * Math.sin(t * 0.4); // slow ~0.5Hz breathing
+  const syllable = 0.5 * Math.sin(t * 2.8); // ~4Hz syllable rhythm
+  const jitter = 0.2 * Math.sin(t * 7.1); // fast micro-variation
   const pulse = Math.max(0, (breath + syllable + jitter + 0.3) / 1.3); // normalize ~0-1
 
   return {
-    scale: baseScale + pulse * 0.12 * baseScale,  // up to ~12% scale change
+    scale: baseScale + pulse * 0.12 * baseScale, // up to ~12% scale change
     glowIntensity: pulse * 0.8,
   };
 }
@@ -96,12 +108,16 @@ export const ShapeRenderer: React.FC<ShapeRendererProps> = ({
   forceSyntheticSpeaking = false,
 }) => {
   // If audio processor is active but no explicit reactivity, add implicit defaults
-  const reactiveLayer = audioProcessor && !layer.audioReactive?.enabled
-    ? withImplicitReactivity(layer)
-    : layer;
+  const reactiveLayer =
+    audioProcessor && !layer.audioReactive?.enabled
+      ? withImplicitReactivity(layer)
+      : layer;
 
   // Calculate audio-reactive property modulations from real audio
-  const reactiveProps = useAudioReactiveProps(reactiveLayer as Layer, audioProcessor);
+  const reactiveProps = useAudioReactiveProps(
+    reactiveLayer as Layer,
+    audioProcessor
+  );
 
   // Browser TTS does not feed Web Audio analyzers, so reported energy can be near zero
   // even while speech is active. Detect that case and allow synthetic speaking fallback.
@@ -119,7 +135,7 @@ export const ShapeRenderer: React.FC<ShapeRendererProps> = ({
     isSpeaking &&
       (forceSyntheticSpeaking || !audioProcessor || !hasProcessorSpeechSignal),
     animationFrame,
-    layer.scale ?? 1,
+    layer.scale ?? 1
   );
 
   // Merge static layer properties with reactive modulations
@@ -233,9 +249,7 @@ export const ShapeRenderer: React.FC<ShapeRendererProps> = ({
               .filter(Boolean)
               .join(' ') || undefined,
           transformOrigin: 'center center',
-          willChange: isAnimating
-            ? 'transform, opacity, filter'
-            : 'auto',
+          willChange: isAnimating ? 'transform, opacity, filter' : 'auto',
         }}
         data-shape-container
       >

@@ -87,7 +87,7 @@ describe('Shape Implementations (1.3c-UNIT-004)', () => {
     });
 
     it('should build radial fill gradient defs with center offsets', () => {
-      const gradientProps = ({
+      const gradientProps = {
         ...defaultProps,
         id: 'gradient-circle',
         type: 'circle',
@@ -100,7 +100,7 @@ describe('Shape Implementations (1.3c-UNIT-004)', () => {
           centerY: 0.2,
         },
         strokeType: 'none',
-      }) as ShapeProperties;
+      } as ShapeProperties;
 
       const defs = (circle as any).createGradientDefs(
         gradientProps,
@@ -108,9 +108,9 @@ describe('Shape Implementations (1.3c-UNIT-004)', () => {
       );
       expect(defs).toBeTruthy();
 
-      const fillGradient = React.Children.toArray((defs as any).props.children).find(
-        (child: any) => child?.props?.id?.endsWith('-fill')
-      ) as any;
+      const fillGradient = React.Children.toArray(
+        (defs as any).props.children
+      ).find((child: any) => child?.props?.id?.endsWith('-fill')) as any;
 
       expect(fillGradient?.type).toBe('radialGradient');
       expect(parseFloat(fillGradient?.props?.cx)).toBeCloseTo(80, 3);
@@ -118,7 +118,7 @@ describe('Shape Implementations (1.3c-UNIT-004)', () => {
     });
 
     it('should build stroke gradient defs with radial metadata', () => {
-      const gradientProps = ({
+      const gradientProps = {
         ...defaultProps,
         id: 'gradient-circle-stroke',
         type: 'circle',
@@ -131,7 +131,7 @@ describe('Shape Implementations (1.3c-UNIT-004)', () => {
           centerY: 0.75,
         },
         fillType: 'none',
-      }) as ShapeProperties;
+      } as ShapeProperties;
 
       const defs = (circle as any).createGradientDefs(
         gradientProps,
@@ -139,9 +139,9 @@ describe('Shape Implementations (1.3c-UNIT-004)', () => {
       );
       expect(defs).toBeTruthy();
 
-      const strokeGradient = React.Children.toArray((defs as any).props.children).find(
-        (child: any) => child?.props?.id?.endsWith('-stroke')
-      ) as any;
+      const strokeGradient = React.Children.toArray(
+        (defs as any).props.children
+      ).find((child: any) => child?.props?.id?.endsWith('-stroke')) as any;
 
       expect(strokeGradient?.type).toBe('radialGradient');
       expect(strokeGradient?.props?.cx).toBe('25%');
@@ -449,4 +449,3 @@ describe('Shape Implementations (1.3c-UNIT-004)', () => {
     });
   });
 });
-

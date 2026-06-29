@@ -32,7 +32,7 @@ const mockMediaStreamSource = {
   connect: jest.fn(),
 } as unknown as MediaStreamAudioSourceNode;
 
-const mockDecodeAudioData = jest.fn(async () => ({} as AudioBuffer));
+const mockDecodeAudioData = jest.fn(async () => ({}) as AudioBuffer);
 const mockCreateBufferSource = jest.fn(
   () => ({ ...mockSourceNode }) as AudioBufferSourceNode
 );
@@ -113,4 +113,3 @@ describe('AudioService', () => {
     expect(mockClose).toHaveBeenCalled();
   });
 });
-

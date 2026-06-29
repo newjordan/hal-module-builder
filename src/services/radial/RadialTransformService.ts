@@ -65,7 +65,8 @@ export class RadialTransformService {
     const progress = targetIndex;
 
     const angleDegrees =
-      baseAngle + direction * (arcCenteringOffset + progress * stepMagnitudeDegrees);
+      baseAngle +
+      direction * (arcCenteringOffset + progress * stepMagnitudeDegrees);
     const angle = angleDegrees * DEG_TO_RAD - Math.PI / 2;
 
     const midAngleDegrees =

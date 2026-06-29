@@ -51,7 +51,11 @@ export const applyFrequencyFilter = (
     | 'mid'
     | 'treble'
     | 'full'
-    | { type: 'lowpass' | 'highpass' | 'bandpass'; cutoff: number; bandwidth?: number },
+    | {
+        type: 'lowpass' | 'highpass' | 'bandpass';
+        cutoff: number;
+        bandwidth?: number;
+      },
   _sampleRate?: number
 ): number[] | Float32Array => {
   // Backward compatibility: object-style filter config API returns full-length typed data.
@@ -276,7 +280,8 @@ export const smoothFrequencyData = (
       const curr = data[i] ?? 0;
       const next = data[i + 1] ?? data[i] ?? 0;
       const neighborhood = (prev + curr + next) / 3;
-      smoothed[i] = curr * (1 - smoothingFactor) + neighborhood * smoothingFactor;
+      smoothed[i] =
+        curr * (1 - smoothingFactor) + neighborhood * smoothingFactor;
     }
     return smoothed;
   }
@@ -334,7 +339,10 @@ export const detectBeat = (
  * @param frequencyData - Frequency domain data
  * @returns Analysis object with frequency bands and dominant frequency
  */
-export const analyzeFrequencySpectrum = (frequencyData: number[], _sampleRate: number = 44100) => {
+export const analyzeFrequencySpectrum = (
+  frequencyData: number[],
+  _sampleRate: number = 44100
+) => {
   const length = frequencyData.length;
   const bandSize = Math.floor(length / 4);
 

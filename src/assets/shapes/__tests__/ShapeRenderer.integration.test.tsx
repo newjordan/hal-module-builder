@@ -362,5 +362,4 @@ describe('ShapeRenderer Integration Tests', () => {
       expect(svg).toBeInTheDocument();
     });
   });
-
 });

@@ -32,7 +32,9 @@ const mockCanvas = {
 };
 
 // Mock createElement for canvas measurement
-const originalCreateElement = document.createElement.bind(document) as typeof document.createElement;
+const originalCreateElement = document.createElement.bind(
+  document
+) as typeof document.createElement;
 const createElementSpy = jest
   .spyOn(document, 'createElement')
   .mockImplementation(((tagName: any) => {
@@ -66,7 +68,8 @@ describe('RadialTextService', () => {
         endAngle: 360,
       };
 
-      const validation: RadialTextValidation = RadialTextService.validateConfig(config);
+      const validation: RadialTextValidation =
+        RadialTextService.validateConfig(config);
 
       expect(validation.isValid).toBe(true);
       expect(validation.errors).toHaveLength(0);
@@ -93,7 +96,9 @@ describe('RadialTextService', () => {
       const validation = RadialTextService.validateConfig(config);
 
       expect(validation.isValid).toBe(false);
-      expect(validation.errors).toContain('theme must be \"frost_light\" or \"frost_dark\" (MANDATORY)');
+      expect(validation.errors).toContain(
+        'theme must be \"frost_light\" or \"frost_dark\" (MANDATORY)'
+      );
     });
 
     it('should reject configuration with invalid radius', () => {
@@ -105,7 +110,9 @@ describe('RadialTextService', () => {
       const validation = RadialTextService.validateConfig(config);
 
       expect(validation.isValid).toBe(false);
-      expect(validation.errors).toContain('innerRadius must be a positive number');
+      expect(validation.errors).toContain(
+        'innerRadius must be a positive number'
+      );
     });
 
     it('should reject configuration with invalid coordinates', () => {
@@ -132,7 +139,9 @@ describe('RadialTextService', () => {
       const validation = RadialTextService.validateConfig(config);
 
       expect(validation.isValid).toBe(true);
-      expect(validation.warnings).toContain('startAngle and endAngle are equal - text may not be visible');
+      expect(validation.warnings).toContain(
+        'startAngle and endAngle are equal - text may not be visible'
+      );
     });
 
     it('should warn about very long text', () => {
@@ -144,7 +153,9 @@ describe('RadialTextService', () => {
       const validation = RadialTextService.validateConfig(config);
 
       expect(validation.isValid).toBe(true);
-      expect(validation.warnings).toContain('Text is very long - consider performance implications');
+      expect(validation.warnings).toContain(
+        'Text is very long - consider performance implications'
+      );
     });
   });
 
@@ -216,12 +227,12 @@ describe('RadialTextService', () => {
       // First character should be at start angle position
       const firstChar = layout.characters[0];
       expect(firstChar.position.x).toBeCloseTo(0, 1); // 0 degrees aligns with positive Y-axis
-      expect(firstChar.position.y).toBeCloseTo(-100, 1);   // At top of the circle
+      expect(firstChar.position.y).toBeCloseTo(-100, 1); // At top of the circle
 
       // Second character should be at end angle position
       const secondChar = layout.characters[1];
-      expect(secondChar.position.x).toBeCloseTo(70.71, 1);   // Positioned midway along the arc
-      expect(secondChar.position.y).toBeCloseTo(-70.71, 1);    // Clockwise placement at roughly -45 degrees
+      expect(secondChar.position.x).toBeCloseTo(70.71, 1); // Positioned midway along the arc
+      expect(secondChar.position.y).toBeCloseTo(-70.71, 1); // Clockwise placement at roughly -45 degrees
     });
 
     it('should apply auto-sizing when enabled', () => {
@@ -354,7 +365,10 @@ describe('RadialTextService', () => {
         text: 'NEW TEXT',
       };
 
-      const layout = RadialTextService.updateLayout(initialCharacters, newConfig);
+      const layout = RadialTextService.updateLayout(
+        initialCharacters,
+        newConfig
+      );
 
       expect(layout.characters).toHaveLength(8); // 'NEW TEXT' has 8 characters
       expect(layout.characters[0].char).toBe('N');
@@ -394,7 +408,10 @@ describe('RadialTextService', () => {
         innerRadius: 75, // Changed radius
       };
 
-      const layout = RadialTextService.updateLayout(initialCharacters, newConfig);
+      const layout = RadialTextService.updateLayout(
+        initialCharacters,
+        newConfig
+      );
 
       expect(layout.characters).toHaveLength(2);
       // Positions should be updated based on new configuration
@@ -500,4 +517,3 @@ describe('RadialTextService', () => {
     });
   });
 });
-

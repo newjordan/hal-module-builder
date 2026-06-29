@@ -118,65 +118,72 @@ export const useAudioReactiveProps = (
     Record<keyof ReactivePropertyValues, number[]>
   > = {};
 
-  layer.audioReactive.mappings.forEach((mapping: AudioReactiveMapping, idx: number) => {
-    let audioValue = audioAnalysis[mapping.audioFeature];
-    if (audioValue === undefined) return;
+  layer.audioReactive.mappings.forEach(
+    (mapping: AudioReactiveMapping, idx: number) => {
+      let audioValue = audioAnalysis[mapping.audioFeature];
+      if (audioValue === undefined) return;
 
-    // Apply noise gate: kill low-level noise so silence = truly zero
-    if (mapping.audioFeature !== 'beat') {
-      audioValue = audioValue <= NOISE_GATE ? 0 : audioValue;
+      // Apply noise gate: kill low-level noise so silence = truly zero
+      if (mapping.audioFeature !== 'beat') {
+        audioValue = audioValue <= NOISE_GATE ? 0 : audioValue;
+      }
+
+      // Get base value from layer (only once per property)
+      if (baseValues[mapping.targetProperty] === undefined) {
+        baseValues[mapping.targetProperty] = getBasePropertyValue(
+          layer,
+          mapping.targetProperty
+        );
+      }
+      const baseValue = baseValues[mapping.targetProperty]!;
+
+      // Calculate modulation range
+      const minValue =
+        mapping.minValue ??
+        getDefaultMinValue(mapping.targetProperty, baseValue);
+      const maxValue =
+        mapping.maxValue ??
+        getDefaultMaxValue(mapping.targetProperty, baseValue);
+      const range = maxValue - minValue;
+
+      // Map audio value through intensity to target value
+      const modulationAmount = audioValue * mapping.intensity * range;
+      const targetValue = minValue + modulationAmount;
+
+      // --- Attack/Release envelope ---
+      // This replaces the old symmetric EMA smoothing. Rising values (attack)
+      // respond quickly so speech onset is snappy. Falling values (release)
+      // decay slowly so the visual doesn't jitter back to zero between syllables.
+      const envKey = `${mapping.targetProperty}_${idx}`;
+      const envelope = envelopeRef.current[envKey] ?? {
+        current: baseValue,
+        lastTimestamp: now,
+      };
+
+      const dt = Math.max(0, (now - envelope.lastTimestamp) / 1000); // seconds
+      const smoothing = mapping.smoothing ?? 0.7;
+      // Scale attack/release times by smoothing parameter (higher = slower)
+      const attackTime = DEFAULT_ATTACK_TIME * (0.3 + smoothing * 1.4);
+      const releaseTime = DEFAULT_RELEASE_TIME * (0.3 + smoothing * 1.4);
+
+      const isRising = targetValue > envelope.current;
+      const tau = isRising ? attackTime : releaseTime;
+      // Time-based exponential approach: independent of frame rate
+      const alpha = 1 - Math.exp(-dt / Math.max(tau, 0.001));
+      const smoothedValue =
+        envelope.current + (targetValue - envelope.current) * alpha;
+
+      envelope.current = smoothedValue;
+      envelope.lastTimestamp = now;
+      envelopeRef.current[envKey] = envelope;
+
+      // Collect modulated values for this property
+      if (!modulatedValues[mapping.targetProperty]) {
+        modulatedValues[mapping.targetProperty] = [];
+      }
+      modulatedValues[mapping.targetProperty]!.push(smoothedValue);
     }
-
-    // Get base value from layer (only once per property)
-    if (baseValues[mapping.targetProperty] === undefined) {
-      baseValues[mapping.targetProperty] = getBasePropertyValue(
-        layer,
-        mapping.targetProperty
-      );
-    }
-    const baseValue = baseValues[mapping.targetProperty]!;
-
-    // Calculate modulation range
-    const minValue =
-      mapping.minValue ?? getDefaultMinValue(mapping.targetProperty, baseValue);
-    const maxValue =
-      mapping.maxValue ?? getDefaultMaxValue(mapping.targetProperty, baseValue);
-    const range = maxValue - minValue;
-
-    // Map audio value through intensity to target value
-    const modulationAmount = audioValue * mapping.intensity * range;
-    const targetValue = minValue + modulationAmount;
-
-    // --- Attack/Release envelope ---
-    // This replaces the old symmetric EMA smoothing. Rising values (attack)
-    // respond quickly so speech onset is snappy. Falling values (release)
-    // decay slowly so the visual doesn't jitter back to zero between syllables.
-    const envKey = `${mapping.targetProperty}_${idx}`;
-    const envelope = envelopeRef.current[envKey] ??
-      { current: baseValue, lastTimestamp: now };
-
-    const dt = Math.max(0, (now - envelope.lastTimestamp) / 1000); // seconds
-    const smoothing = mapping.smoothing ?? 0.7;
-    // Scale attack/release times by smoothing parameter (higher = slower)
-    const attackTime = DEFAULT_ATTACK_TIME * (0.3 + smoothing * 1.4);
-    const releaseTime = DEFAULT_RELEASE_TIME * (0.3 + smoothing * 1.4);
-
-    const isRising = targetValue > envelope.current;
-    const tau = isRising ? attackTime : releaseTime;
-    // Time-based exponential approach: independent of frame rate
-    const alpha = 1 - Math.exp(-dt / Math.max(tau, 0.001));
-    const smoothedValue = envelope.current + (targetValue - envelope.current) * alpha;
-
-    envelope.current = smoothedValue;
-    envelope.lastTimestamp = now;
-    envelopeRef.current[envKey] = envelope;
-
-    // Collect modulated values for this property
-    if (!modulatedValues[mapping.targetProperty]) {
-      modulatedValues[mapping.targetProperty] = [];
-    }
-    modulatedValues[mapping.targetProperty]!.push(smoothedValue);
-  });
+  );
 
   // Combine multiple modulations per property using additive deltas
   const result: Partial<ReactivePropertyValues> = {};

@@ -105,17 +105,19 @@ export function DesignMode({ className = '' }: DesignModeProps) {
 
   // Restore images from IndexedDB on mount
   React.useEffect(() => {
-    ImageStore.loadAll().then(images => {
-      if (Object.keys(images).length === 0) return;
-      setLayers((prev: Layer[]) =>
-        prev.map(l => {
-          if (l.type === 'image' && !l.src && images[l.id]) {
-            return { ...l, src: images[l.id] as string };
-          }
-          return l;
-        })
-      );
-    }).catch(() => {});
+    ImageStore.loadAll()
+      .then(images => {
+        if (Object.keys(images).length === 0) return;
+        setLayers((prev: Layer[]) =>
+          prev.map(l => {
+            if (l.type === 'image' && !l.src && images[l.id]) {
+              return { ...l, src: images[l.id] as string };
+            }
+            return l;
+          })
+        );
+      })
+      .catch(() => {});
   }, []);
 
   // Keep a ref to the latest layers so the unmount cleanup can access them

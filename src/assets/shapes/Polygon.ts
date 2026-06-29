@@ -116,7 +116,7 @@ export class PolygonShape extends BaseShape<PolygonProperties> {
     const radius = shapeSpecific?.radius ?? props.radius ?? 50;
 
     // Calculate the total size needed for the canvas
-    const totalSize = (radius * 2) + (strokeWidth * 2);
+    const totalSize = radius * 2 + strokeWidth * 2;
     const center = totalSize / 2;
 
     const points: [number, number][] = [];

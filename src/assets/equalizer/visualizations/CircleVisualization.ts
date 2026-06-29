@@ -106,7 +106,8 @@ export class CircleVisualization extends BaseVisualization {
     const startAngle = config.arcMode ? (config.startAngle ?? 0) : 0;
     const endAngle = config.arcMode ? (config.endAngle ?? 360) : 360;
     const arcSpan = (endAngle - startAngle) * (Math.PI / 180);
-    const isPartialArc = config.arcMode && Math.abs(endAngle - startAngle) < 360;
+    const isPartialArc =
+      config.arcMode && Math.abs(endAngle - startAngle) < 360;
 
     // For partial arcs, center elements within the arc for better visual symmetry
     const divisions = dataCount;
@@ -296,7 +297,8 @@ export class CircleVisualization extends BaseVisualization {
     const startAngle = config.arcMode ? (config.startAngle ?? 0) : 0;
     const endAngle = config.arcMode ? (config.endAngle ?? 360) : 360;
     const arcSpan = (endAngle - startAngle) * (Math.PI / 180);
-    const isPartialArc = config.arcMode && Math.abs(endAngle - startAngle) < 360;
+    const isPartialArc =
+      config.arcMode && Math.abs(endAngle - startAngle) < 360;
 
     const divisions = dataCount;
     const angleStep = arcSpan / divisions;

@@ -59,7 +59,6 @@ export class BarVisualization extends BaseVisualization {
   // E6.1 Audio Processing Modules
   private peakTrackingState: PeakTrackingState;
 
-
   constructor(audioProcessor: any) {
     // Keep existing signature for compatibility
     super(audioProcessor);

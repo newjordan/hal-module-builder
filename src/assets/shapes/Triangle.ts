@@ -126,8 +126,8 @@ export class TriangleShape extends BaseShape<TriangleProperties> {
     const height = (Math.sqrt(3) / 2) * size;
 
     // Calculate the total size needed for the canvas
-    const totalWidth = size + (strokeWidth * 2);
-    const totalHeight = height + (strokeWidth * 2);
+    const totalWidth = size + strokeWidth * 2;
+    const totalHeight = height + strokeWidth * 2;
 
     // The center of the new, larger canvas
     const centerX = totalWidth / 2;
@@ -139,9 +139,7 @@ export class TriangleShape extends BaseShape<TriangleProperties> {
       [centerX + size / 2, centerY + height / 2],
     ];
 
-    const pointsString = points
-      .map(p => `${p[0]},${p[1]}`)
-      .join(' ');
+    const pointsString = points.map(p => `${p[0]},${p[1]}`).join(' ');
 
     return React.createElement(
       'svg',
