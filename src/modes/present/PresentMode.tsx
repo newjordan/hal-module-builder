@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { HalComposite } from '../../components/HalComposite/HalComposite';
 import { Layer } from '../../types/layer-types';
 import { useMode } from '../ModeContext';
+import { useAudioContext } from '../../hooks/useAudioContext';
 
 interface PresentModeProps {
   layers: Layer[];
@@ -15,9 +16,12 @@ export function PresentMode({
   onDoubleClick,
 }: PresentModeProps) {
   const { setMode } = useMode();
-  const [isActive, setIsActive] = useState(false);
-  const [audioData, setAudioData] = useState<number[]>([]);
   const [size, setSize] = useState(400);
+
+  // Real microphone audio — same pipeline as Design mode
+  const { audioData, isActive, toggleAudio } = useAudioContext(layers, {
+    fftSize: 128,
+  });
 
   // Calculate optimal size based on viewport
   useEffect(() => {
@@ -32,33 +36,9 @@ export function PresentMode({
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Generate mock audio data when active (will be replaced with real audio)
-  useEffect(() => {
-    if (!isActive) {
-      setAudioData([]);
-      return;
-    }
-
-    let animationId: number;
-    const updateAudio = () => {
-      // Generate smooth mock audio data
-      const data = Array.from({ length: 64 }, (_, i) => {
-        const time = Date.now() / 1000;
-        const base = Math.sin(time * 2 + i * 0.2) * 0.3 + 0.5;
-        const variation = Math.sin(time * 5 + i * 0.5) * 0.2;
-        return Math.max(0, Math.min(1, base + variation));
-      });
-      setAudioData(data);
-      animationId = requestAnimationFrame(updateAudio);
-    };
-
-    animationId = requestAnimationFrame(updateAudio);
-    return () => cancelAnimationFrame(animationId);
-  }, [isActive]);
-
   const handleClick = useCallback(() => {
-    setIsActive(prev => !prev);
-  }, []);
+    void toggleAudio();
+  }, [toggleAudio]);
 
   const handleDoubleClick = useCallback(() => {
     if (onDoubleClick) {
@@ -95,7 +75,7 @@ export function PresentMode({
             height: size * 2,
             borderRadius: '50%',
             background:
-              'radial-gradient(circle, rgba(100, 150, 255, 0.1) 0%, transparent 70%)',
+              'radial-gradient(circle, rgba(255, 80, 30, 0.08) 0%, transparent 70%)',
             pointerEvents: 'none',
             animation: 'pulse 4s ease-in-out infinite',
           }}
@@ -109,7 +89,7 @@ export function PresentMode({
           borderRadius: '50%',
           overflow: 'hidden',
           boxShadow: isActive
-            ? '0 0 60px rgba(100, 150, 255, 0.3), 0 0 120px rgba(100, 150, 255, 0.1)'
+            ? '0 0 60px rgba(255, 60, 20, 0.25), 0 0 120px rgba(255, 60, 20, 0.08)'
             : '0 10px 40px rgba(0, 0, 0, 0.3)',
           transition: 'box-shadow 0.5s ease',
         }}

@@ -31,6 +31,8 @@ system**: radial text, radial symmetry, and circular audio visualizations.
 - **Effects** — inner/outer glow and inner/outer shadow per layer.
 - **Design / Present modes** — a full editor and a distraction-free
   full-screen presentation view.
+- **Ships with the HAL eye** — the app opens with a curated, audio-reactive
+  HAL-9000-style default design; use it as-is or tear it apart in the editor.
 
 ## Tech stack
 

@@ -19,8 +19,10 @@ interface DesignModeProps {
   className?: string;
 }
 
-// Default starting layer for new sessions
-const DEFAULT_LAYERS: Layer[] = [];
+import { DEFAULT_HAL_LAYERS } from '../../config/defaultHalDesign';
+
+// Default starting design for new sessions — the signature HAL eye
+const DEFAULT_LAYERS: Layer[] = DEFAULT_HAL_LAYERS;
 
 /** Persist layers: images to IndexedDB, metadata to localStorage */
 function saveLayersToStorage(layers: Layer[]) {

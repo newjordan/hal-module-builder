@@ -10,32 +10,10 @@ import {
   DesignMode,
 } from './modes';
 import { ImageStore } from './services/ImageStore';
+import { DEFAULT_HAL_LAYERS } from './config/defaultHalDesign';
 
-// Default layers for present mode when no saved layers exist
-const DEFAULT_LAYERS = [
-  {
-    id: 'default-equalizer',
-    name: 'Audio Visualizer',
-    type: 'equalizer' as const,
-    visible: true,
-    opacity: 1,
-    scale: 1,
-    rotation: 0,
-    offsetX: 0,
-    offsetY: 0,
-    blendMode: 'normal' as const,
-    equalizerSettings: {
-      barCount: 64,
-      barWidth: 4,
-      barSpacing: 2,
-      maxHeight: 150,
-      colorMode: 'rainbow' as const,
-      primaryColor: '#00ffff',
-      secondaryColor: '#ff00ff',
-    },
-    visualizationType: 'bar' as const,
-  },
-];
+// Default design when no saved layers exist — the signature HAL eye
+const DEFAULT_LAYERS = DEFAULT_HAL_LAYERS;
 
 /** Read layers from localStorage synchronously (no images — just metadata) */
 function loadLayersFromStorage() {
@@ -142,7 +120,7 @@ function AppShell({
 
 function App() {
   const [theme, setTheme] = useState<'frost_light' | 'frost_dark'>(
-    'frost_light'
+    'frost_dark'
   );
 
   // Load theme from localStorage on mount and initialize effects library
