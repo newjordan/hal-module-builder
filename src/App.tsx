@@ -11,6 +11,7 @@ import {
 } from './modes';
 import { ImageStore } from './services/ImageStore';
 import { DEFAULT_HAL_LAYERS } from './config/defaultHalDesign';
+import { AgentConsole } from './components/AgentConsole/AgentConsole';
 
 // Default design when no saved layers exist — the signature HAL eye
 const DEFAULT_LAYERS = DEFAULT_HAL_LAYERS;
@@ -204,19 +205,21 @@ function App() {
         console.error('App Error Context:', error, errorInfo);
       }}
     >
-      <ModeProvider defaultMode='design'>
-        <Router>
-          <div className={theme}>
-            <Routes>
-              {/* Main app route - mode-based rendering */}
-              <Route
-                path='/'
-                element={<AppShell theme={theme} onThemeToggle={toggleTheme} />}
-              />
-            </Routes>
-          </div>
-        </Router>
-      </ModeProvider>
+      <Router>
+        <Routes>
+          <Route path='/' element={<AgentConsole />} />
+          <Route
+            path='/studio'
+            element={
+              <ModeProvider defaultMode='design'>
+                <div className={theme}>
+                  <AppShell theme={theme} onThemeToggle={toggleTheme} />
+                </div>
+              </ModeProvider>
+            }
+          />
+        </Routes>
+      </Router>
     </ErrorBoundary>
   );
 }

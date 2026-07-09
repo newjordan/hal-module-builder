@@ -1,84 +1,113 @@
 <div align="center">
 
-<img src="public/hal_lens_1.png" alt="HAL" width="160" />
+<img src="public/hal_lens_1.png" alt="HAL Agent Operations" width="160" />
 
-# HAL Module Builder
+# HAL Agent Operations
 
-**A browser-based, audio-reactive visual design tool.**
+**A live notification, telemetry, and control surface for agent fleets.**
 
-Build layered visuals — shapes, images, radial text, and audio equalizers —
-and drive them in real time with live audio. Design in the editor, then flip
-to a full-screen present mode. Its signature is the **radial graphics
-system**: radial text, radial symmetry, and circular audio visualizations.
-
-![demo](public/loop_v1.gif)
+HAL turns agent lifecycle events into an operational display where every visual
+signal has a job: thinking, tool execution, waiting, completion, failure,
+progress, queue pressure, context use, and operator attention each have a
+distinct color, motion, icon, and trace.
 
 </div>
 
----
+## What it does
 
-## Features
+- **Visual agent identity** - stable callsigns and identity marks make agents
+  recognizable independently of status color.
+- **Semantic HAL lens** - the selected agent's center instrument maps reasoning,
+  execution, determinate progress, context pressure, and heartbeat state to
+  separate rings and motion patterns.
+- **Observable cognition stream** - safe producer-supplied summaries, tool calls,
+  messages, and system events appear in a bounded live log. HAL never invents or
+  exposes hidden chain-of-thought.
+- **Attention queue** - approvals, failures, completions, and sustained warning
+  signals support acknowledge, resolve, approve, and retry workflows.
+- **Fleet trace** - a synchronized five-minute timeline shows thought, tool,
+  approval, completion, and error events across every registered agent.
+- **Real feedback channels** - optional alert tones and desktop notifications;
+  outbound operator commands publish through `CustomEvent`, `BroadcastChannel`,
+  and an attached WebSocket.
+- **Multiple event sources** - a deterministic local simulation works out of the
+  box, while page events, same-origin tabs/workers, and a WebSocket bridge can
+  stream real events.
+- **Live Codex sidecar** - the included localhost-only bridge tails current
+  workspace sessions, emits safe lifecycle/tool/token telemetry, redacts visible
+  commentary, and never forwards prompts, reasoning ciphertext, tool arguments,
+  or raw tool output.
+- **Persistent operations state** - acknowledgements, filters, selected agent,
+  retained events, and preferences survive reloads in local storage.
+- **Responsive operations layout** - dense desktop, compact laptop, and mobile
+  arrangements preserve the primary lens and keep the attention queue reachable.
 
-- **Layer-based editor** — compose visuals from shape, image, radial-text, and
-  equalizer layers, each with transform, appearance, and effect controls.
-- **Live audio reactivity** — map microphone / system audio to layer properties
-  (scale, opacity, rotation, stroke width, brightness, hue shift, glow) with
-  per-mapping intensity, attack/release smoothing, and beat detection.
-- **Radial graphics** — radial text layout (arc mode, inner radius, orientation),
-  an n-fold radial symmetry engine, and circular/radial audio visualizations.
-- **Equalizer / visualizer** — bar, circle, dot, diamond, and hexagon
-  visualizations with configurable color modes, frequency range, and symmetry.
-- **Effects** — inner/outer glow and inner/outer shadow per layer.
-- **Design / Present modes** — a full editor and a distraction-free
-  full-screen presentation view.
-- **Ships with the HAL eye** — the app opens with a curated, audio-reactive
-  HAL-9000-style default design; use it as-is or tear it apart in the editor.
+The original visual layer composer is preserved at `/studio` as the internal
+HAL Lens Studio.
 
-## Tech stack
+## Run it
 
-React 18 · TypeScript · Vite · Canvas/Web Audio · Jest + Testing Library ·
-Tailwind CSS
-
-## Getting started
-
-Requires **Node.js 18+**.
+Requires Node.js 18 or newer.
 
 ```bash
-# install dependencies
 npm install
-
-# start the dev server (http://localhost:5173)
 npm run dev
-
-# production build
-npm run build
-npm run preview
 ```
 
-Allow microphone access when prompted to drive the visuals with live audio.
+Open `http://localhost:5173`. The console starts in clearly labeled simulation
+mode and can be paused from the top bar.
 
-## Scripts
+For real Codex session telemetry, start the sidecar and frontend together:
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the Vite dev server |
-| `npm run build` | Type-check and build for production |
-| `npm test` | Run the Jest test suite |
-| `npm run test:coverage` | Run tests with coverage |
-| `npm run lint` | Lint `src` with ESLint |
-| `npm run format` | Format `src` with Prettier |
-| `npm run type-check` | Type-check without emitting |
-| `npm run quality` | Type-check + lint + format check |
+```bash
+npm run dev:live
+```
 
-## Documentation
+The sidecar binds `127.0.0.1:8765`, accepts the exact local Vite origins, and by
+default includes only sessions whose `cwd` matches the repository where it was
+started. Override that filter with `HAL_WORKSPACE=/absolute/path`. The bridge is
+intentionally read-only: operator commands receive a correlated rejection
+rather than controlling a Codex process without an explicit command adapter.
 
-Technical docs live in [`docs/`](docs/) — see
-[`docs/architecture/system-architecture-overview.md`](docs/architecture/system-architecture-overview.md)
-for the high-level design.
+To attach a WebSocket event source:
 
-## Contributing
+```dotenv
+VITE_HAL_AGENT_WS_URL=ws://127.0.0.1:8765/hal-agent-events
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [Agent Event Bridge](docs/agent-event-bridge.md) for the canonical event
+payload, inbound transports, outbound command channel, validation behavior, and
+security boundaries.
+
+## Integration surfaces
+
+| Surface | Direction | Name |
+| --- | --- | --- |
+| DOM CustomEvent | Inbound | `hal:agent-event` |
+| DOM CustomEvent | Outbound | `hal:agent-command` |
+| BroadcastChannel | Inbound | `hal-agent-events` |
+| BroadcastChannel | Outbound | `hal-agent-commands` |
+| Window API | Both | `window.HAL_AGENT_NOTIFICATIONS` |
+| WebSocket | Both | `VITE_HAL_AGENT_WS_URL` |
+
+Inbound WebSocket messages are one event or an array of events. Outbound
+commands use `{ "type": "agent.command", "command": { ... } }`. Live socket
+connections automatically stop the demo stream so simulated and real activity
+cannot be confused.
+
+## Quality commands
+
+```bash
+npm run type-check
+npm test -- --runInBand
+npm run test:bridge
+npm run lint
+npm run build
+```
+
+## Stack
+
+React 18, TypeScript, Vite, Lucide React, Jest, Testing Library, Canvas/Web Audio.
 
 ## License
 
