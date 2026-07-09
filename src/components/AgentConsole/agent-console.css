@@ -2082,6 +2082,29 @@
   margin-top: 2px;
 }
 
+.ops-empty-state {
+  align-items: center;
+  color: var(--ops-text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.ops-empty-state strong {
+  color: var(--ops-text);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ops-empty-state span {
+  font-size: 12px;
+  max-width: 420px;
+}
+
 .ops-footer {
   align-items: center;
   background: #080a0c;
@@ -2373,10 +2396,6 @@
     grid-column: 1 / -1;
     grid-row: 2;
     width: 100%;
-  }
-
-  .connection-pill {
-    display: none;
   }
 
   .ops-workspace {

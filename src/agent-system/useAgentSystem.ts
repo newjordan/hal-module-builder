@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import { agentSystemReducer, createEventId } from './reducer';
+import {
+  agentSystemReducer,
+  createEventId,
+  MAX_COMMANDS,
+  MAX_EVENTS,
+} from './reducer';
 import { createInitialAgentSystemState } from './seed';
 import type {
   AgentCommand,
@@ -160,13 +165,15 @@ function hydrateState(): AgentSystemState {
       .filter((agent): agent is NonNullable<typeof agent> => Boolean(agent));
     const events = rawState.events
       .map(parseStoredEvent)
-      .filter((event): event is NonNullable<typeof event> => Boolean(event));
+      .filter((event): event is NonNullable<typeof event> => Boolean(event))
+      .slice(0, MAX_EVENTS);
     const pendingCommands = Array.isArray(rawState.pendingCommands)
       ? rawState.pendingCommands
           .map(parseStoredCommand)
           .filter((command): command is NonNullable<typeof command> =>
             Boolean(command)
           )
+          .slice(0, MAX_COMMANDS)
       : [];
     if (agents.length !== rawState.agents.length) return fallback;
 
@@ -243,13 +250,32 @@ export function useAgentSystem() {
 
   useEffect(() => {
     stateRef.current = state;
-    const stored: StoredState = { version: 2, state };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-    } catch {
-      // The console remains fully functional if persistence is unavailable.
-    }
+    const timer = window.setTimeout(() => {
+      const stored: StoredState = { version: 2, state };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+      } catch {
+        // The console remains fully functional if persistence is unavailable.
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [state]);
+
+  useEffect(() => {
+    const flush = () => {
+      const stored: StoredState = { version: 2, state: stateRef.current };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+      } catch {
+        // The console remains fully functional if persistence is unavailable.
+      }
+    };
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, []);
 
   const playSignal = useCallback((severity: AgentEventInput['severity']) => {
     if (!stateRef.current.soundEnabled || severity === 'trace') return;
@@ -435,7 +461,13 @@ export function useAgentSystem() {
     let retryTimer: number | undefined;
     let closed = false;
     let retries = 0;
-    let liveTelemetryStarted = false;
+
+    let socketHost = socketUrl;
+    try {
+      socketHost = new URL(socketUrl, window.location.href).host || socketUrl;
+    } catch {
+      // Keep the raw configured value as the display label.
+    }
 
     const connect = () => {
       dispatch({
@@ -444,18 +476,22 @@ export function useAgentSystem() {
         label: 'Connecting event stream',
         source: 'websocket',
       });
-      socket = new WebSocket(socketUrl);
+      try {
+        socket = new WebSocket(socketUrl);
+      } catch {
+        socketConfiguredRef.current = false;
+        dispatch({
+          type: 'SET_CONNECTION',
+          connection: 'offline',
+          label: 'Invalid event stream URL',
+          source: 'websocket',
+        });
+        return;
+      }
       socketRef.current = socket;
       socket.onopen = () => {
         retries = 0;
-        externalSourceRef.current = true;
-        dispatch({ type: 'SET_SIMULATION', enabled: false });
-        dispatch({
-          type: 'SET_CONNECTION',
-          connection: 'connected',
-          label: new URL(socketUrl, window.location.href).host,
-          source: 'websocket',
-        });
+        activateLiveSource(socketHost, 'websocket');
         for (const command of queuedSocketCommands.current) {
           socket?.send(JSON.stringify({ type: 'agent.command', command }));
           dispatch({
@@ -475,13 +511,6 @@ export function useAgentSystem() {
           );
           if (validEvents.some(event => !event)) {
             throw new Error('Invalid event shape');
-          }
-          if (!liveTelemetryStarted) {
-            activateLiveSource(
-              new URL(socketUrl, window.location.href).host,
-              'websocket'
-            );
-            liveTelemetryStarted = true;
           }
           validEvents.forEach(event => {
             if (event) emit(event);
@@ -528,7 +557,7 @@ export function useAgentSystem() {
   }, [activateLiveSource, emit]);
 
   useEffect(() => {
-    if (!state.simulationEnabled || state.connection === 'connected') return;
+    if (!state.simulationEnabled || state.connection !== 'demo') return;
     const timer = window.setInterval(() => {
       const frame =
         simulationFrames[simulationIndex.current % simulationFrames.length];
@@ -693,9 +722,23 @@ export function useAgentSystem() {
     setFilter: (filter: EventFilter) =>
       dispatch({ type: 'SET_FILTER', filter }),
     setSimulation: (enabled: boolean) => {
-      if (!externalSourceRef.current) {
-        dispatch({ type: 'SET_SIMULATION', enabled });
+      if (externalSourceRef.current) {
+        if (
+          !enabled ||
+          stateRef.current.connection !== 'offline' ||
+          socketRef.current
+        ) {
+          return;
+        }
+        externalSourceRef.current = false;
+        dispatch({
+          type: 'SET_CONNECTION',
+          connection: 'demo',
+          source: 'demo',
+          label: 'Local simulation',
+        });
       }
+      dispatch({ type: 'SET_SIMULATION', enabled });
     },
     setSound,
     requestDesktopAlerts,

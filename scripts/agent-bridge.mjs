@@ -5,20 +5,20 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
 
+export function envInt(value, fallback) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const HOST = '127.0.0.1';
-const PORT = Number.parseInt(process.env.HAL_BRIDGE_PORT || '8765', 10);
+const PORT = envInt(process.env.HAL_BRIDGE_PORT, 8765);
 const ROUTE = '/hal-agent-events';
 const MAX_HISTORY = 120;
 const MAX_LINE_BYTES = 2 * 1024 * 1024;
-const POLL_MS = Math.max(
-  250,
-  Number.parseInt(process.env.HAL_POLL_MS || '750', 10)
-);
+const MAX_SEEN_IDS = 5000;
+const POLL_MS = Math.max(250, envInt(process.env.HAL_POLL_MS, 750));
 const LOOKBACK_MS =
-  Math.max(1, Number.parseInt(process.env.HAL_LOOKBACK_HOURS || '24', 10)) *
-  60 *
-  60 *
-  1000;
+  Math.max(1, envInt(process.env.HAL_LOOKBACK_HOURS, 24)) * 60 * 60 * 1000;
 const WORKSPACE = path.resolve(process.env.HAL_WORKSPACE || process.cwd());
 const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 const SESSIONS_ROOT = path.join(CODEX_HOME, 'sessions');
@@ -108,11 +108,12 @@ function agentRegistration(context) {
   };
 }
 
-export function createSessionContext(metadata = {}) {
+export function createSessionContext(metadata = {}, epoch = 0) {
   return {
     sessionId: String(
       metadata.sessionId || metadata.id || 'unknown-session'
     ).slice(0, 128),
+    epoch,
     parentAgentId:
       metadata.parentAgentId ||
       metadata.parent_thread_id ||
@@ -148,8 +149,9 @@ export function createSessionContext(metadata = {}) {
 }
 
 function baseEvent(context, record, offset, suffix) {
+  const generation = context.epoch ? `r${context.epoch}:` : '';
   return {
-    id: `${context.sessionId}:${offset}:${suffix}`.slice(0, 256),
+    id: `${context.sessionId}:${generation}${offset}:${suffix}`.slice(0, 256),
     agentId: context.sessionId,
     timestamp: eventTime(record),
     sessionId: context.sessionId,
@@ -476,8 +478,9 @@ export class JsonlDecoder {
 }
 
 async function readFirstRecord(file) {
-  const handle = await fs.open(file, 'r');
+  let handle;
   try {
+    handle = await fs.open(file, 'r');
     const buffer = Buffer.alloc(256 * 1024);
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
     const newline = buffer.subarray(0, bytesRead).indexOf(0x0a);
@@ -486,7 +489,7 @@ async function readFirstRecord(file) {
   } catch {
     return null;
   } finally {
-    await handle.close();
+    await handle?.close().catch(() => {});
   }
 }
 
@@ -569,9 +572,18 @@ async function main() {
   const clients = new Set();
   let polling = false;
 
+  const remember = (seen, id) => {
+    seen.add(id);
+    if (seen.size <= MAX_SEEN_IDS) return;
+    for (const stale of seen) {
+      seen.delete(stale);
+      if (seen.size <= MAX_SEEN_IDS) break;
+    }
+  };
+
   const publish = event => {
     if (!event?.id || seenEvents.has(event.id)) return;
-    seenEvents.add(event.id);
+    remember(seenEvents, event.id);
     history.push(event);
     if (history.length > MAX_HISTORY)
       history.splice(0, history.length - MAX_HISTORY);
@@ -623,11 +635,13 @@ async function main() {
       tracker.position = 0;
       tracker.inode = stat.ino;
       tracker.decoder.reset(0);
-      tracker.context = createSessionContext(tracker.metadata);
+      tracker.epoch = (tracker.epoch || 0) + 1;
+      tracker.context = createSessionContext(tracker.metadata, tracker.epoch);
     }
     if (stat.size === tracker.position) return;
-    const handle = await fs.open(tracker.file, 'r');
+    let handle;
     try {
+      handle = await fs.open(tracker.file, 'r');
       const length = stat.size - tracker.position;
       const chunk = Buffer.alloc(length);
       const start = tracker.position;
@@ -650,8 +664,10 @@ async function main() {
         ))
           publish(event);
       }
+    } catch {
+      // A session file can disappear between stat and read; retry next poll.
     } finally {
-      await handle.close();
+      await handle?.close().catch(() => {});
     }
   };
 
@@ -697,6 +713,8 @@ async function main() {
     try {
       await discover();
       for (const tracker of trackers.values()) await pollTracker(tracker);
+    } catch (error) {
+      console.error(`[hal-bridge] poll failed: ${error.message}`);
     } finally {
       polling = false;
     }
@@ -725,7 +743,7 @@ async function main() {
       }
       const command = validCommandEnvelope(parsed);
       if (!command || seenCommands.has(command.id)) return;
-      seenCommands.add(command.id);
+      remember(seenCommands, command.id);
       publish(commandRejection(command));
     });
     socket.on('close', () => clients.delete(socket));

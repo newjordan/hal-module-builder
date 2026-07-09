@@ -37,7 +37,7 @@ export interface ShapeRendererProps {
 function withImplicitReactivity(
   layer: ShapeRendererProps['layer']
 ): ShapeRendererProps['layer'] {
-  if (layer.audioReactive?.enabled) return layer; // already configured
+  if (layer.audioReactive?.enabled != null) return layer; // already configured
   return {
     ...layer,
     audioReactive: {
@@ -107,9 +107,11 @@ export const ShapeRenderer: React.FC<ShapeRendererProps> = ({
   isSpeaking = false,
   forceSyntheticSpeaking = false,
 }) => {
-  // If audio processor is active but no explicit reactivity, add implicit defaults
+  // If audio processor is active and the layer has no explicit reactivity
+  // configuration, add implicit defaults. A layer explicitly configured with
+  // enabled=false stays static.
   const reactiveLayer =
-    audioProcessor && !layer.audioReactive?.enabled
+    audioProcessor && layer.audioReactive?.enabled == null
       ? withImplicitReactivity(layer)
       : layer;
 

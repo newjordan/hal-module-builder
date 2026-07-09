@@ -4,6 +4,7 @@ import {
   JsonlDecoder,
   commandRejection,
   createSessionContext,
+  envInt,
   isAllowedUpgrade,
   normalizeRecord,
   sanitizeVisibleText,
@@ -121,4 +122,33 @@ test('creates correlated read-only command rejection events', () => {
   assert.equal(event.commandId, 'command-1');
   assert.equal(event.commandStatus, 'rejected');
   assert.equal(event.timestamp, 2);
+});
+
+test('falls back to defaults on malformed numeric env values', () => {
+  assert.equal(envInt('750', 250), 750);
+  assert.equal(envInt('not-a-number', 250), 250);
+  assert.equal(envInt('', 250), 250);
+  assert.equal(envInt(undefined, 8765), 8765);
+});
+
+test('rotated session files produce fresh event ids at repeated offsets', () => {
+  const record = {
+    timestamp: '2026-07-09T20:00:00.000Z',
+    type: 'event_msg',
+    payload: { type: 'task_started', turn_id: 'turn-1' },
+  };
+  const original = normalizeRecord(
+    record,
+    createSessionContext({ sessionId: 'session-1' }),
+    128
+  );
+  const afterRotation = normalizeRecord(
+    record,
+    createSessionContext({ sessionId: 'session-1' }, 1),
+    128
+  );
+  assert.ok(original[0].id);
+  assert.ok(afterRotation[0].id);
+  assert.notEqual(original[0].id, afterRotation[0].id);
+  assert.match(afterRotation[0].id, /:r1:/);
 });

@@ -93,4 +93,35 @@ describe('AgentConsole', () => {
       screen.getByRole('heading', { level: 1, name: 'Codex Prime' })
     ).toBeInTheDocument();
   });
+
+  it('keeps the connection indicator visible when no agent is registered', () => {
+    localStorage.setItem(
+      'hal-agent-operations-v1',
+      JSON.stringify({
+        version: 2,
+        state: {
+          agents: [],
+          events: [
+            {
+              id: 'live-1',
+              agentId: 'live-agent',
+              kind: 'system',
+              severity: 'info',
+              title: 'Bridge signal',
+              detail: 'A live event without a surviving agent snapshot.',
+              timestamp: Date.now(),
+              acknowledged: true,
+              resolved: true,
+              source: 'bridge',
+            },
+          ],
+        },
+      })
+    );
+
+    render(<AgentConsole />);
+    expect(screen.getByText('No agents registered yet')).toBeInTheDocument();
+    expect(screen.getByText(/live source is offline/i)).toBeInTheDocument();
+    expect(screen.getByText('Awaiting live source')).toBeInTheDocument();
+  });
 });

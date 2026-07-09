@@ -423,4 +423,79 @@ describe('agentSystemReducer', () => {
     expect(state.agents.map(agent => agent.id)).toEqual(['live-agent']);
     expect(state.events.map(event => event.source)).toEqual(['bridge']);
   });
+
+  it('rejects a late-delivered event from a previous run', () => {
+    const current = ingest(
+      createEmptyState(),
+      createEvent({
+        id: 'run-b-event',
+        runId: 'run-b',
+        sequence: 10,
+        timestamp: 5_000,
+        progress: 80,
+      })
+    );
+
+    const afterStale = ingest(
+      current,
+      createEvent({
+        id: 'run-a-late-event',
+        runId: 'run-a',
+        sequence: 900,
+        timestamp: 2_000,
+        state: 'error',
+        progress: 5,
+      })
+    );
+
+    const agent = afterStale.agents[0];
+    expect(agent.activeRunId).toBe('run-b');
+    expect(agent.progress).toBe(80);
+    expect(agent.state).toBe('processing');
+    expect(agent.lastSeen).toBe(5_000);
+  });
+
+  it('accepts a genuinely newer run and resets tracking to it', () => {
+    const current = ingest(
+      createEmptyState(),
+      createEvent({
+        id: 'run-a-event',
+        runId: 'run-a',
+        sequence: 40,
+        timestamp: 5_000,
+        progress: 70,
+      })
+    );
+
+    const nextRun = createEvent({
+      id: 'run-b-first-event',
+      runId: 'run-b',
+      sequence: 1,
+      timestamp: 6_000,
+      state: 'thinking',
+    });
+    delete nextRun.progress;
+    const afterNewRun = ingest(current, nextRun);
+
+    const agent = afterNewRun.agents[0];
+    expect(agent.activeRunId).toBe('run-b');
+    expect(agent.progress).toBe(0);
+    expect(agent.progressKnown).toBe(false);
+  });
+
+  it('clamps out-of-range progress on the stored event, not only the agent', () => {
+    const huge = ingest(
+      createEmptyState(),
+      createEvent({ id: 'huge-progress', progress: 1e9 })
+    );
+    expect(huge.events[0].progress).toBe(100);
+    expect(huge.agents[0].progress).toBe(100);
+
+    const negative = ingest(
+      createEmptyState(),
+      createEvent({ id: 'negative-progress', progress: -5 })
+    );
+    expect(negative.events[0].progress).toBe(0);
+    expect(negative.agents[0].progress).toBe(0);
+  });
 });

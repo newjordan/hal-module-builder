@@ -333,15 +333,17 @@ function Header({
         </div>
         <IconButton
           label={
-            connection !== 'demo'
+            connection === 'connected' || connection === 'connecting'
               ? 'Simulation disabled while a live source is active'
-              : simulationEnabled
-                ? 'Pause event simulation'
-                : 'Resume event simulation'
+              : connection === 'offline'
+                ? 'Switch back to event simulation'
+                : simulationEnabled
+                  ? 'Pause event simulation'
+                  : 'Resume event simulation'
           }
           active={simulationEnabled}
           toggle
-          disabled={connection !== 'demo'}
+          disabled={connection === 'connected' || connection === 'connecting'}
           onClick={() => setSimulation(!simulationEnabled)}
         >
           {simulationEnabled ? <Pause size={17} /> : <Play size={17} />}
@@ -415,7 +417,7 @@ function AgentRail({
       if (filter === 'completed') return agent.state === 'completed';
       return true;
     });
-  }, [agents, filter, query]);
+  }, [agents, events, filter, query]);
 
   return (
     <aside className='agent-rail' aria-label='Agent roster'>
@@ -1049,7 +1051,7 @@ function AttentionCenter({
         </div>
       </div>
 
-      <div className='attention-list' aria-live='assertive'>
+      <div className='attention-list'>
         {alerts.slice(0, 5).map(event => {
           const agent = agents.find(item => item.id === event.agentId);
           const AlertIcon = KIND_ICONS[event.kind];
@@ -1066,16 +1068,9 @@ function AttentionCenter({
             <article
               key={event.id}
               className={`attention-card severity-${event.severity}${event.acknowledged ? ' is-acknowledged' : ''}${selectedEventId === event.id ? ' is-selected' : ''}`}
-              role='button'
-              tabIndex={0}
+              role='group'
               aria-label={`${agent?.name || event.agentId}: ${event.title}`}
               onClick={focusEvent}
-              onKeyDown={keyEvent => {
-                if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
-                  keyEvent.preventDefault();
-                  focusEvent();
-                }
-              }}
             >
               <div className='attention-card__signal'>
                 <AlertIcon size={16} aria-hidden='true' />
@@ -1458,21 +1453,66 @@ export function AgentConsole() {
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
       if (
         event.key === '/' &&
-        !(event.target instanceof HTMLInputElement) &&
-        !(event.target instanceof HTMLTextAreaElement)
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !isEditableTarget
       ) {
         event.preventDefault();
         document.querySelector<HTMLInputElement>('.ops-search input')?.focus();
       }
-      if (event.key === 'Escape') setQuery('');
+      if (event.key === 'Escape' && !event.isComposing) {
+        const searchInput =
+          document.querySelector<HTMLInputElement>('.ops-search input');
+        if (target === searchInput || !isEditableTarget) setQuery('');
+      }
     };
     window.addEventListener('keydown', focusSearch);
     return () => window.removeEventListener('keydown', focusSearch);
   }, []);
 
-  if (!selectedAgent) return null;
+  if (!selectedAgent) {
+    return (
+      <div className='agent-console'>
+        <Header
+          agents={state.agents}
+          events={state.events}
+          query={query}
+          onQueryChange={setQuery}
+          simulationEnabled={state.simulationEnabled}
+          setSimulation={setSimulation}
+          soundEnabled={state.soundEnabled}
+          setSound={setSound}
+          desktopAlertsEnabled={state.desktopAlertsEnabled}
+          requestDesktopAlerts={requestDesktopAlerts}
+          connection={state.connection}
+          connectionLabel={state.connectionLabel}
+          now={now}
+        />
+        <div className='ops-empty-state' role='status'>
+          <strong>No agents registered yet</strong>
+          <span>
+            {state.connection === 'offline'
+              ? 'The live source is offline. Restart the bridge or resume the event simulation to continue.'
+              : 'Waiting for the first agent event to arrive.'}
+          </span>
+        </div>
+        <Footer
+          agents={state.agents}
+          events={state.events}
+          connection={state.connection}
+          connectionSource={state.connectionSource}
+        />
+      </div>
+    );
+  }
   const selectedEvent = state.events.find(
     event => event.id === selectedEventId
   );

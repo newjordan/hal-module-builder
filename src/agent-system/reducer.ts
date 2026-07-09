@@ -9,7 +9,8 @@ import type {
   AgentSystemState,
 } from './types';
 
-const MAX_EVENTS = 120;
+export const MAX_EVENTS = 120;
+export const MAX_COMMANDS = 50;
 
 export function createEventId(prefix = 'event'): string {
   const random =
@@ -91,7 +92,9 @@ export function normalizeEvent(input: AgentEventInput): AgentEvent {
     source: input.source ?? 'bridge',
     ...(input.state ? { state: input.state } : {}),
     ...(input.stage ? { stage: input.stage } : {}),
-    ...(input.progress !== undefined ? { progress: input.progress } : {}),
+    ...(input.progress !== undefined && Number.isFinite(input.progress)
+      ? { progress: clampProgress(input.progress, 0) }
+      : {}),
     ...(input.task ? { task: input.task } : {}),
     ...(input.tool ? { tool: input.tool } : {}),
     ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
@@ -158,7 +161,7 @@ function updateAgentFromEvent(agent: Agent, event: AgentEvent): Agent {
     agent.lastSequence !== undefined
   ) {
     if (event.sequence <= agent.lastSequence) return agent;
-  } else if (sameRun && event.timestamp < agent.lastSeen) {
+  } else if (event.timestamp < agent.lastSeen) {
     return agent;
   }
 
@@ -398,7 +401,7 @@ export function agentSystemReducer(
           ...state.pendingCommands.filter(
             command => command.id !== action.command.id
           ),
-        ].slice(0, 50),
+        ].slice(0, MAX_COMMANDS),
       };
     case 'SET_COMMAND_STATUS':
       return {

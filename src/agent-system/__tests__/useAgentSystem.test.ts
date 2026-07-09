@@ -1,0 +1,122 @@
+import { act, renderHook } from '@testing-library/react';
+import { agentSystemReducer, MAX_EVENTS } from '../reducer';
+import type { AgentEventInput, AgentSystemState } from '../types';
+import { useAgentSystem } from '../useAgentSystem';
+
+const STORAGE_KEY = 'hal-agent-operations-v1';
+
+function createEmptyState(): AgentSystemState {
+  return {
+    agents: [],
+    events: [],
+    selectedAgentId: '',
+    filter: 'all',
+    simulationEnabled: false,
+    soundEnabled: false,
+    desktopAlertsEnabled: false,
+    connection: 'demo',
+    connectionSource: 'demo',
+    connectionLabel: 'Test bridge',
+    pendingCommands: [],
+  };
+}
+
+function createLiveEvent(
+  overrides: Partial<AgentEventInput> = {}
+): AgentEventInput {
+  return {
+    id: 'live-event-1',
+    agentId: 'live-agent',
+    kind: 'tool',
+    state: 'processing',
+    severity: 'info',
+    title: 'Tool started',
+    detail: 'The agent started a focused operation.',
+    timestamp: 1_000,
+    progress: 25,
+    task: 'Verify hydration',
+    source: 'bridge',
+    ...overrides,
+  };
+}
+
+function seedStoredState(state: AgentSystemState): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, state }));
+}
+
+function liveState(): AgentSystemState {
+  return agentSystemReducer(createEmptyState(), {
+    type: 'INGEST_EVENT',
+    event: createLiveEvent(),
+  });
+}
+
+describe('useAgentSystem', () => {
+  afterEach(() => {
+    localStorage.clear();
+    delete (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__;
+    delete (globalThis as Record<string, unknown>).WebSocket;
+    delete (window as unknown as Record<string, unknown>).WebSocket;
+  });
+
+  it('caps hydrated events and pending commands at the ingest limits', () => {
+    const base = liveState();
+    const template = base.events[0];
+    seedStoredState({
+      ...base,
+      events: Array.from({ length: MAX_EVENTS + 80 }, (_, index) => ({
+        ...template,
+        id: `stored-event-${index}`,
+        timestamp: 1_000 + index,
+      })),
+      pendingCommands: Array.from({ length: 80 }, (_, index) => ({
+        id: `stored-command-${index}`,
+        agentId: 'live-agent',
+        action: 'retry' as const,
+        timestamp: 1_000 + index,
+        status: 'queued' as const,
+      })),
+    });
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    expect(result.current.state.events.length).toBeLessThanOrEqual(MAX_EVENTS);
+    expect(result.current.state.pendingCommands.length).toBeLessThanOrEqual(50);
+    unmount();
+  });
+
+  it('hydrates live history as offline and recovers back to demo mode', () => {
+    seedStoredState(liveState());
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    expect(result.current.state.connection).toBe('offline');
+    expect(result.current.state.simulationEnabled).toBe(false);
+
+    act(() => {
+      result.current.setSimulation(true);
+    });
+    expect(result.current.state.connection).toBe('demo');
+    expect(result.current.state.simulationEnabled).toBe(true);
+    unmount();
+  });
+
+  it('survives a WebSocket constructor throw on a malformed configured URL', () => {
+    (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__ =
+      'http://[malformed';
+    class ThrowingWebSocket {
+      static OPEN = 1;
+      constructor() {
+        throw new SyntaxError('invalid websocket url');
+      }
+    }
+    (window as unknown as Record<string, unknown>).WebSocket =
+      ThrowingWebSocket;
+    (globalThis as Record<string, unknown>).WebSocket = ThrowingWebSocket;
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    expect(result.current.state.connection).toBe('offline');
+    expect(result.current.state.connectionLabel).toBe(
+      'Invalid event stream URL'
+    );
+    unmount();
+  });
+});
