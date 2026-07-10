@@ -1,4 +1,4 @@
-# Contributing to HAL Module Builder
+# Contributing to HAL Agent Operations
 
 Thanks for your interest in contributing! This project uses a simple,
 disciplined GitHub workflow.

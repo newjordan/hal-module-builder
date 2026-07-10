@@ -93,7 +93,9 @@ security boundaries.
 Inbound WebSocket messages are one event or an array of events. Outbound
 commands use `{ "type": "agent.command", "command": { ... } }`. Live socket
 connections automatically stop the demo stream so simulated and real activity
-cannot be confused.
+cannot be confused. If the live socket drops, resuming the simulation restores
+the demo fleet, and a top-bar reconnect control re-attaches the live stream
+once the bridge is back.
 
 ## Quality commands
 

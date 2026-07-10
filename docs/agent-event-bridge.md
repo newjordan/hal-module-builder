@@ -152,6 +152,11 @@ Each server message is one event or a flat event array. One invalid array member
 rejects that entire batch. HAL reconnects with capped exponential backoff,
 queues at most 50 pending socket commands, and flushes them after reconnect.
 
+While the socket is offline the operator can resume the local simulation, which
+restores the demo fleet and suppresses automatic reconnection. A top-bar
+reconnect control then re-attaches the live stream; if that attempt fails, HAL
+returns to the demo state instead of leaving the console offline.
+
 ```json
 [
   {
@@ -237,6 +242,8 @@ the deterministic demo source performs the acknowledgement locally.
 ## Delivery semantics
 
 - A first valid live event disables simulation and removes demo agents/events.
+- Resuming simulation while the live source is offline restores the demo state;
+  a failed live reconnect falls back to it atomically.
 - Event IDs are synchronously deduplicated before sound or desktop feedback.
 - At most 120 events are retained, newest timestamp first.
 - Sequence order wins within a run; timestamp order is the fallback.
