@@ -225,6 +225,16 @@ function hydrateState(): AgentSystemState {
   }
 }
 
+function isValidSocketUrl(rawUrl: string): boolean {
+  if (!rawUrl) return false;
+  try {
+    const parsed = new URL(rawUrl, window.location.href);
+    return ['ws:', 'wss:', 'http:', 'https:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
 function shouldAlert(event: AgentEventInput): boolean {
   return (
     event.actionable === true ||
@@ -475,6 +485,20 @@ export function useAgentSystem() {
     let retryTimer: number | undefined;
     let closed = false;
     let retries = 0;
+    let recoveringFromDemo = false;
+
+    const restoreDemo = () => {
+      recoveringFromDemo = false;
+      demoRecoveryRef.current = true;
+      externalSourceRef.current = false;
+      dispatch({
+        type: 'SET_CONNECTION',
+        connection: 'demo',
+        source: 'demo',
+        label: 'Local simulation',
+      });
+      dispatch({ type: 'SET_SIMULATION', enabled: true });
+    };
 
     let socketHost = socketUrl;
     try {
@@ -494,6 +518,10 @@ export function useAgentSystem() {
       try {
         socket = new WebSocket(socketUrl);
       } catch {
+        if (recoveringFromDemo) {
+          restoreDemo();
+          return;
+        }
         socketConfiguredRef.current = false;
         dispatch({
           type: 'SET_CONNECTION',
@@ -505,6 +533,7 @@ export function useAgentSystem() {
       }
       socketRef.current = socket;
       socket.onopen = () => {
+        recoveringFromDemo = false;
         retries = 0;
         activateLiveSource(socketHost, 'websocket');
         for (const command of queuedSocketCommands.current) {
@@ -546,6 +575,10 @@ export function useAgentSystem() {
       socket.onclose = () => {
         socketRef.current = null;
         if (closed || demoRecoveryRef.current) return;
+        if (recoveringFromDemo) {
+          restoreDemo();
+          return;
+        }
         retries += 1;
         dispatch({
           type: 'SET_CONNECTION',
@@ -565,6 +598,7 @@ export function useAgentSystem() {
       if (closed || socketRef.current) return;
       window.clearTimeout(retryTimer);
       retries = 0;
+      recoveringFromDemo = demoRecoveryRef.current;
       demoRecoveryRef.current = false;
       externalSourceRef.current = true;
       connect();
@@ -748,11 +782,11 @@ export function useAgentSystem() {
       dispatch({ type: 'SET_FILTER', filter }),
     setSimulation: (enabled: boolean) => {
       if (externalSourceRef.current) {
-        if (
-          !enabled ||
-          stateRef.current.connection !== 'offline' ||
-          socketRef.current
-        ) {
+        if (!enabled) {
+          dispatch({ type: 'SET_SIMULATION', enabled: false });
+          return;
+        }
+        if (stateRef.current.connection !== 'offline' || socketRef.current) {
           return;
         }
         externalSourceRef.current = false;
@@ -768,7 +802,7 @@ export function useAgentSystem() {
     },
     liveSourceConfigured:
       typeof __HAL_AGENT_WS_URL__ === 'string' &&
-      __HAL_AGENT_WS_URL__.trim() !== '',
+      isValidSocketUrl(__HAL_AGENT_WS_URL__.trim()),
     reconnectLive: () => reconnectLiveRef.current?.(),
     setSound,
     requestDesktopAlerts,

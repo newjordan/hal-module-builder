@@ -204,6 +204,175 @@ describe('useAgentSystem', () => {
     jest.useRealTimers();
   });
 
+  it('returns to demo mode with simulation enabled when reconnect-live fails', () => {
+    jest.useFakeTimers();
+    seedStoredState(liveState());
+    (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__ =
+      'ws://127.0.0.1:8765/agents';
+
+    class FakeWebSocket {
+      static OPEN = 1;
+      static instances: FakeWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onmessage: ((message: { data: string }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      readyState = 0;
+      constructor() {
+        FakeWebSocket.instances.push(this);
+      }
+      send(): void {}
+      close(): void {
+        this.onclose?.();
+      }
+    }
+    (window as unknown as Record<string, unknown>).WebSocket = FakeWebSocket;
+    (globalThis as Record<string, unknown>).WebSocket = FakeWebSocket;
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    act(() => {
+      FakeWebSocket.instances[0]?.onclose?.();
+    });
+    act(() => {
+      result.current.setSimulation(true);
+    });
+    expect(result.current.state.connection).toBe('demo');
+
+    act(() => {
+      result.current.reconnectLive();
+    });
+    expect(result.current.state.connection).toBe('connecting');
+
+    act(() => {
+      FakeWebSocket.instances[1]?.onclose?.();
+    });
+    expect(result.current.state.connection).toBe('demo');
+    expect(result.current.state.simulationEnabled).toBe(true);
+
+    act(() => {
+      jest.advanceTimersByTime(120_000);
+    });
+    expect(result.current.state.connection).toBe('demo');
+    expect(FakeWebSocket.instances.length).toBe(2);
+
+    act(() => {
+      result.current.reconnectLive();
+    });
+    expect(result.current.state.connection).toBe('connecting');
+    act(() => {
+      FakeWebSocket.instances[2]?.onopen?.();
+    });
+    expect(result.current.state.connection).toBe('connected');
+
+    unmount();
+    jest.useRealTimers();
+  });
+
+  it('returns to demo mode when reconnect-live throws on construction', () => {
+    jest.useFakeTimers();
+    seedStoredState(liveState());
+    (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__ =
+      'ws://127.0.0.1:8765/agents';
+
+    class FlakyWebSocket {
+      static OPEN = 1;
+      static count = 0;
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onmessage: ((message: { data: string }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      readyState = 0;
+      static instances: FlakyWebSocket[] = [];
+      constructor() {
+        FlakyWebSocket.count += 1;
+        if (FlakyWebSocket.count > 1) {
+          throw new SyntaxError('invalid websocket url');
+        }
+        FlakyWebSocket.instances.push(this);
+      }
+      send(): void {}
+      close(): void {
+        this.onclose?.();
+      }
+    }
+    (window as unknown as Record<string, unknown>).WebSocket = FlakyWebSocket;
+    (globalThis as Record<string, unknown>).WebSocket = FlakyWebSocket;
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    act(() => {
+      FlakyWebSocket.instances[0]?.onclose?.();
+    });
+    act(() => {
+      result.current.setSimulation(true);
+    });
+    expect(result.current.state.connection).toBe('demo');
+
+    act(() => {
+      result.current.reconnectLive();
+    });
+    expect(result.current.state.connection).toBe('demo');
+    expect(result.current.state.simulationEnabled).toBe(true);
+
+    unmount();
+    jest.useRealTimers();
+  });
+
+  it('always allows switching the simulation toggle off with an external source', () => {
+    jest.useFakeTimers();
+    seedStoredState(liveState());
+    (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__ =
+      'ws://127.0.0.1:8765/agents';
+
+    class FakeWebSocket {
+      static OPEN = 1;
+      static instances: FakeWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onmessage: ((message: { data: string }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      readyState = 0;
+      constructor() {
+        FakeWebSocket.instances.push(this);
+      }
+      send(): void {}
+      close(): void {
+        this.onclose?.();
+      }
+    }
+    (window as unknown as Record<string, unknown>).WebSocket = FakeWebSocket;
+    (globalThis as Record<string, unknown>).WebSocket = FakeWebSocket;
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    act(() => {
+      FakeWebSocket.instances[0]?.onclose?.();
+    });
+    act(() => {
+      result.current.setSimulation(true);
+    });
+    act(() => {
+      result.current.reconnectLive();
+    });
+    expect(result.current.state.connection).toBe('connecting');
+    expect(result.current.state.simulationEnabled).toBe(true);
+
+    act(() => {
+      result.current.setSimulation(false);
+    });
+    expect(result.current.state.simulationEnabled).toBe(false);
+
+    act(() => {
+      FakeWebSocket.instances[1]?.onclose?.();
+    });
+    act(() => {
+      result.current.setSimulation(true);
+    });
+    expect(result.current.state.simulationEnabled).toBe(true);
+    expect(result.current.state.connection).toBe('demo');
+
+    unmount();
+    jest.useRealTimers();
+  });
+
   it('persists within the max-wait bound under a sustained event stream', () => {
     jest.useFakeTimers();
     seedStoredState(createEmptyState());
@@ -257,6 +426,7 @@ describe('useAgentSystem', () => {
     expect(result.current.state.connectionLabel).toBe(
       'Invalid event stream URL'
     );
+    expect(result.current.liveSourceConfigured).toBe(false);
     unmount();
   });
 });
