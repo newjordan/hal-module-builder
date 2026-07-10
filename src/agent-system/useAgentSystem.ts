@@ -26,6 +26,8 @@ import {
 const STORAGE_KEY = 'hal-agent-operations-v1';
 const BRIDGE_CHANNEL = 'hal-agent-events';
 const COMMAND_CHANNEL = 'hal-agent-commands';
+const PERSIST_DEBOUNCE_MS = 400;
+const PERSIST_MAX_WAIT_MS = 5_000;
 
 interface StoredState {
   version: 2;
@@ -246,23 +248,33 @@ export function useAgentSystem() {
   const socketConfiguredRef = useRef(false);
   const queuedSocketCommands = useRef<AgentCommand[]>([]);
   const externalSourceRef = useRef(state.connection !== 'demo');
+  const demoRecoveryRef = useRef(false);
   const seenEventIds = useRef(new Set(state.events.map(event => event.id)));
+  const lastPersistRef = useRef(Date.now());
 
   useEffect(() => {
     stateRef.current = state;
-    const timer = window.setTimeout(() => {
+    const persist = () => {
+      lastPersistRef.current = Date.now();
       const stored: StoredState = { version: 2, state };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
       } catch {
         // The console remains fully functional if persistence is unavailable.
       }
-    }, 400);
+    };
+    const sinceLastPersist = Date.now() - lastPersistRef.current;
+    const delay =
+      sinceLastPersist >= PERSIST_MAX_WAIT_MS
+        ? 0
+        : Math.min(PERSIST_DEBOUNCE_MS, PERSIST_MAX_WAIT_MS - sinceLastPersist);
+    const timer = window.setTimeout(persist, delay);
     return () => window.clearTimeout(timer);
   }, [state]);
 
   useEffect(() => {
     const flush = () => {
+      lastPersistRef.current = Date.now();
       const stored: StoredState = { version: 2, state: stateRef.current };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
@@ -337,6 +349,7 @@ export function useAgentSystem() {
   const activateLiveSource = useCallback(
     (label: string, source: Exclude<ConnectionSource, 'demo'>) => {
       externalSourceRef.current = true;
+      demoRecoveryRef.current = false;
       dispatch({ type: 'ACTIVATE_LIVE', label, source });
     },
     []
@@ -470,6 +483,7 @@ export function useAgentSystem() {
     }
 
     const connect = () => {
+      if (demoRecoveryRef.current) return;
       dispatch({
         type: 'SET_CONNECTION',
         connection: 'connecting',
@@ -530,7 +544,7 @@ export function useAgentSystem() {
       };
       socket.onclose = () => {
         socketRef.current = null;
-        if (closed) return;
+        if (closed || demoRecoveryRef.current) return;
         retries += 1;
         dispatch({
           type: 'SET_CONNECTION',
@@ -731,6 +745,7 @@ export function useAgentSystem() {
           return;
         }
         externalSourceRef.current = false;
+        demoRecoveryRef.current = true;
         dispatch({
           type: 'SET_CONNECTION',
           connection: 'demo',

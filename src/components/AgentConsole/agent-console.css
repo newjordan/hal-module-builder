@@ -1810,7 +1810,24 @@
   margin-left: auto;
 }
 
-.attention-card__body > strong {
+.attention-card__focus {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.attention-card__focus:focus-visible {
+  outline: 1px solid var(--alert-color);
+  outline-offset: 2px;
+}
+
+.attention-card__focus strong {
   color: var(--ops-text);
   display: block;
   font-size: 10px;

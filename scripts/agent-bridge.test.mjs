@@ -6,6 +6,7 @@ import {
   createSessionContext,
   envInt,
   isAllowedUpgrade,
+  logTrackerReadError,
   normalizeRecord,
   sanitizeVisibleText,
 } from './agent-bridge.mjs';
@@ -151,4 +152,24 @@ test('rotated session files produce fresh event ids at repeated offsets', () => 
   assert.ok(afterRotation[0].id);
   assert.notEqual(original[0].id, afterRotation[0].id);
   assert.match(afterRotation[0].id, /:r1:/);
+});
+
+test('logs persistent tracker read failures once and skips ENOENT races', () => {
+  const tracker = { file: '/tmp/session.jsonl' };
+  const messages = [];
+  const logger = { error: message => messages.push(message) };
+
+  const enoent = Object.assign(new Error('gone'), { code: 'ENOENT' });
+  assert.equal(logTrackerReadError(tracker, enoent, logger), false);
+  assert.equal(messages.length, 0);
+
+  const eacces = Object.assign(new Error('denied'), { code: 'EACCES' });
+  assert.equal(logTrackerReadError(tracker, eacces, logger), true);
+  assert.equal(logTrackerReadError(tracker, eacces, logger), false);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /read failed for \/tmp\/session\.jsonl/);
+
+  tracker.readErrorLogged = false;
+  assert.equal(logTrackerReadError(tracker, eacces, logger), true);
+  assert.equal(messages.length, 2);
 });

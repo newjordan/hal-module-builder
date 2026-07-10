@@ -99,6 +99,89 @@ describe('useAgentSystem', () => {
     unmount();
   });
 
+  it('keeps demo mode after recovery despite pending WebSocket retries', () => {
+    jest.useFakeTimers();
+    seedStoredState(liveState());
+    (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__ =
+      'ws://127.0.0.1:8765/agents';
+
+    class FakeWebSocket {
+      static OPEN = 1;
+      static instances: FakeWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onmessage: ((message: { data: string }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      readyState = 0;
+      constructor() {
+        FakeWebSocket.instances.push(this);
+      }
+      send(): void {}
+      close(): void {
+        this.onclose?.();
+      }
+    }
+    (window as unknown as Record<string, unknown>).WebSocket = FakeWebSocket;
+    (globalThis as Record<string, unknown>).WebSocket = FakeWebSocket;
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    expect(result.current.state.connection).toBe('connecting');
+
+    act(() => {
+      FakeWebSocket.instances[0]?.onclose?.();
+    });
+    expect(result.current.state.connection).toBe('offline');
+
+    act(() => {
+      result.current.setSimulation(true);
+    });
+    expect(result.current.state.connection).toBe('demo');
+
+    act(() => {
+      jest.advanceTimersByTime(120_000);
+    });
+    expect(result.current.state.connection).toBe('demo');
+    expect(FakeWebSocket.instances.length).toBe(1);
+
+    unmount();
+    jest.useRealTimers();
+  });
+
+  it('persists within the max-wait bound under a sustained event stream', () => {
+    jest.useFakeTimers();
+    seedStoredState(createEmptyState());
+    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem');
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    setItemSpy.mockClear();
+
+    for (let index = 0; index < 20; index += 1) {
+      act(() => {
+        result.current.emit(
+          createLiveEvent({
+            id: `stream-${index}`,
+            timestamp: 1_000 + index,
+            source: 'demo',
+          })
+        );
+      });
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+    }
+
+    expect(setItemSpy.mock.calls.some(call => call[0] === STORAGE_KEY)).toBe(
+      true
+    );
+
+    setItemSpy.mockRestore();
+    unmount();
+    jest.useRealTimers();
+  });
+
   it('survives a WebSocket constructor throw on a malformed configured URL', () => {
     (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__ =
       'http://[malformed';

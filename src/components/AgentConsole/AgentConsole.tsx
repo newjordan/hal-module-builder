@@ -993,7 +993,7 @@ function Timeline({
   );
 }
 
-function AttentionCenter({
+export function AttentionCenter({
   agents,
   events,
   selectedEventId,
@@ -1082,7 +1082,13 @@ function AttentionCenter({
                     {relativeTime(event.timestamp, now)}
                   </time>
                 </div>
-                <strong>{event.title}</strong>
+                <button
+                  type='button'
+                  className='attention-card__focus'
+                  onClick={focusEvent}
+                >
+                  <strong>{event.title}</strong>
+                </button>
                 <p>{event.detail}</p>
                 <div
                   className='attention-card__actions'

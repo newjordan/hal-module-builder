@@ -564,6 +564,16 @@ export function commandRejection(command, timestamp = Date.now()) {
   };
 }
 
+export function logTrackerReadError(tracker, error, logger = console) {
+  if (error?.code === 'ENOENT') return false;
+  if (tracker.readErrorLogged) return false;
+  tracker.readErrorLogged = true;
+  logger.error(
+    `[hal-bridge] read failed for ${tracker.file}: ${error?.message || error}`
+  );
+  return true;
+}
+
 async function main() {
   const trackers = new Map();
   const history = [];
@@ -664,8 +674,9 @@ async function main() {
         ))
           publish(event);
       }
-    } catch {
-      // A session file can disappear between stat and read; retry next poll.
+      tracker.readErrorLogged = false;
+    } catch (error) {
+      logTrackerReadError(tracker, error);
     } finally {
       await handle?.close().catch(() => {});
     }
