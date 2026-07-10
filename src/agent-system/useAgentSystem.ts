@@ -249,6 +249,7 @@ export function useAgentSystem() {
   const queuedSocketCommands = useRef<AgentCommand[]>([]);
   const externalSourceRef = useRef(state.connection !== 'demo');
   const demoRecoveryRef = useRef(false);
+  const reconnectLiveRef = useRef<(() => void) | null>(null);
   const seenEventIds = useRef(new Set(state.events.map(event => event.id)));
   const lastPersistRef = useRef(Date.now());
 
@@ -560,6 +561,15 @@ export function useAgentSystem() {
       socket.onerror = () => socket?.close();
     };
 
+    reconnectLiveRef.current = () => {
+      if (closed || socketRef.current) return;
+      window.clearTimeout(retryTimer);
+      retries = 0;
+      demoRecoveryRef.current = false;
+      externalSourceRef.current = true;
+      connect();
+    };
+
     connect();
     return () => {
       closed = true;
@@ -567,6 +577,7 @@ export function useAgentSystem() {
       socket?.close();
       socketRef.current = null;
       socketConfiguredRef.current = false;
+      reconnectLiveRef.current = null;
     };
   }, [activateLiveSource, emit]);
 
@@ -755,6 +766,10 @@ export function useAgentSystem() {
       }
       dispatch({ type: 'SET_SIMULATION', enabled });
     },
+    liveSourceConfigured:
+      typeof __HAL_AGENT_WS_URL__ === 'string' &&
+      __HAL_AGENT_WS_URL__.trim() !== '',
+    reconnectLive: () => reconnectLiveRef.current?.(),
     setSound,
     requestDesktopAlerts,
     handleEvent,

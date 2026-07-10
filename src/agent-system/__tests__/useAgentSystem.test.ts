@@ -147,6 +147,63 @@ describe('useAgentSystem', () => {
     jest.useRealTimers();
   });
 
+  it('reconnects the live WebSocket source on demand after demo recovery', () => {
+    jest.useFakeTimers();
+    seedStoredState(liveState());
+    (globalThis as Record<string, unknown>).__HAL_AGENT_WS_URL__ =
+      'ws://127.0.0.1:8765/agents';
+
+    class FakeWebSocket {
+      static OPEN = 1;
+      static instances: FakeWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onmessage: ((message: { data: string }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      readyState = 0;
+      constructor() {
+        FakeWebSocket.instances.push(this);
+      }
+      send(): void {}
+      close(): void {
+        this.onclose?.();
+      }
+    }
+    (window as unknown as Record<string, unknown>).WebSocket = FakeWebSocket;
+    (globalThis as Record<string, unknown>).WebSocket = FakeWebSocket;
+
+    const { result, unmount } = renderHook(() => useAgentSystem());
+    expect(result.current.liveSourceConfigured).toBe(true);
+
+    act(() => {
+      FakeWebSocket.instances[0]?.onclose?.();
+    });
+    act(() => {
+      result.current.setSimulation(true);
+    });
+    expect(result.current.state.connection).toBe('demo');
+
+    act(() => {
+      result.current.reconnectLive();
+    });
+    expect(result.current.state.connection).toBe('connecting');
+    expect(FakeWebSocket.instances.length).toBe(2);
+
+    act(() => {
+      FakeWebSocket.instances[1]?.onopen?.();
+    });
+    expect(result.current.state.connection).toBe('connected');
+    expect(result.current.state.connectionSource).toBe('websocket');
+
+    act(() => {
+      result.current.reconnectLive();
+    });
+    expect(FakeWebSocket.instances.length).toBe(2);
+
+    unmount();
+    jest.useRealTimers();
+  });
+
   it('persists within the max-wait bound under a sustained event stream', () => {
     jest.useFakeTimers();
     seedStoredState(createEmptyState());

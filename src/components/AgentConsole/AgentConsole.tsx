@@ -243,6 +243,8 @@ function Header({
   requestDesktopAlerts,
   connection,
   connectionLabel,
+  liveSourceConfigured,
+  onReconnectLive,
   now,
 }: {
   agents: Agent[];
@@ -257,6 +259,8 @@ function Header({
   requestDesktopAlerts: () => Promise<boolean>;
   connection: 'demo' | 'connecting' | 'connected' | 'offline';
   connectionLabel: string;
+  liveSourceConfigured: boolean;
+  onReconnectLive: () => void;
   now: number;
 }) {
   const activeCount = agents.filter(agent =>
@@ -331,6 +335,14 @@ function Header({
           <ConnectionIcon size={13} aria-hidden='true' />
           <span>{connection === 'demo' ? 'Simulation' : connectionLabel}</span>
         </div>
+        {liveSourceConfigured && connection === 'demo' ? (
+          <IconButton
+            label='Reconnect live event stream'
+            onClick={onReconnectLive}
+          >
+            <RotateCcw size={17} />
+          </IconButton>
+        ) : null}
         <IconButton
           label={
             connection === 'connected' || connection === 'connecting'
@@ -1070,7 +1082,6 @@ export function AttentionCenter({
               className={`attention-card severity-${event.severity}${event.acknowledged ? ' is-acknowledged' : ''}${selectedEventId === event.id ? ' is-selected' : ''}`}
               role='group'
               aria-label={`${agent?.name || event.agentId}: ${event.title}`}
-              onClick={focusEvent}
             >
               <div className='attention-card__signal'>
                 <AlertIcon size={16} aria-hidden='true' />
@@ -1441,6 +1452,8 @@ export function AgentConsole() {
     acknowledgeAll,
     clearResolved,
     toggleAgentPause,
+    liveSourceConfigured,
+    reconnectLive,
   } = controller;
   const [query, setQuery] = useState('');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(
@@ -1500,6 +1513,8 @@ export function AgentConsole() {
           requestDesktopAlerts={requestDesktopAlerts}
           connection={state.connection}
           connectionLabel={state.connectionLabel}
+          liveSourceConfigured={liveSourceConfigured}
+          onReconnectLive={reconnectLive}
           now={now}
         />
         <div className='ops-empty-state' role='status'>
@@ -1538,6 +1553,8 @@ export function AgentConsole() {
         requestDesktopAlerts={requestDesktopAlerts}
         connection={state.connection}
         connectionLabel={state.connectionLabel}
+        liveSourceConfigured={liveSourceConfigured}
+        onReconnectLive={reconnectLive}
         now={now}
       />
 

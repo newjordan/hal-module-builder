@@ -52,4 +52,35 @@ describe('AttentionCenter', () => {
     expect(onSelectAgent).toHaveBeenCalledWith('agent-1');
     expect(onSelectEvent).toHaveBeenCalledWith('event-1');
   });
+
+  it('invokes feed focus exactly once per title click without card-level bubbling', async () => {
+    const onSelectAgent = jest.fn();
+    const onSelectEvent = jest.fn();
+    render(
+      <AttentionCenter
+        agents={[]}
+        events={[createAlertEvent()]}
+        selectedEventId={null}
+        onSelectAgent={onSelectAgent}
+        onSelectEvent={onSelectEvent}
+        onHandleEvent={jest.fn()}
+        onAcknowledgeAll={jest.fn()}
+        onClearResolved={jest.fn()}
+        pendingCommands={[]}
+        now={2_000}
+      />
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Approval required' })
+    );
+    expect(onSelectAgent).toHaveBeenCalledTimes(1);
+    expect(onSelectEvent).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(
+      screen.getByRole('group', { name: /agent-1: Approval required/ })
+    );
+    expect(onSelectAgent).toHaveBeenCalledTimes(1);
+    expect(onSelectEvent).toHaveBeenCalledTimes(1);
+  });
 });
