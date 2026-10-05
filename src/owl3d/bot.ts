@@ -17,14 +17,7 @@ import {
   toolColor,
 } from './config';
 import { LENS_RADIUS, LayerEye } from './eye';
-import {
-  Beam,
-  Label,
-  coneGeometry,
-  glowSprite,
-  particles,
-  sleepTexture,
-} from './fx';
+import { Beam, coneGeometry, glowSprite, particles, sleepTexture } from './fx';
 import type { EyePart } from './layerPlan';
 import type { Socket } from './manifest';
 import { ModelInstance, modelLibrary } from './models';
@@ -33,7 +26,6 @@ import { Arm, Cable, headForTool, isDataTool, partInstance } from './rig';
 import { DESK, HATCH, type Desk, type Hatch } from './station';
 import { clamp, clock, damp, rand, scene } from './stage';
 import { floorPulse } from './world';
-import { toolWord } from './words';
 
 export type PortalEvent = AgentEventInput & { replay?: boolean };
 
@@ -213,7 +205,6 @@ export class Bot {
     THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>
   >;
   private readonly motes: THREE.Sprite[];
-  private readonly label = new Label();
   private readonly cone = new Beam(coneGeometry);
   private eye: LayerEye | null = null;
   private models: ModelInstance[] = [];
@@ -471,7 +462,6 @@ export class Bot {
       case 'tool':
         if (event.state === 'processing') {
           this.toolTint.set(toolColor(tool));
-          this.label.show(toolWord(tool), toolColor(tool), 4);
           if (isDataTool(tool)) {
             // Reads and searches go down the cable to the inner computer.
             this.setMode('compute');
@@ -496,7 +486,6 @@ export class Bot {
         break;
       case 'message':
         if (event.stage === 'intake') {
-          this.label.show('NEW TASK', STATE_COLORS.thinking, 2.5);
           floorPulse(
             this.position.x,
             this.position.z,
@@ -512,7 +501,6 @@ export class Bot {
         this.startDelivery(event.task || this.lastWork);
         break;
       case 'approval':
-        this.label.show('APPROVE?', STATE_COLORS.waiting, 6);
         this.setMode('attention');
         break;
       default:
@@ -545,7 +533,6 @@ export class Bot {
     this.plot.release(slot); // broken blocks never hold a place in the stack
     this.arms?.R.reach(block.position, clock.now + 0.8, headForTool(this.tool));
     particles.burst(block.position.clone(), [0xff3030, 0xffb030], 24, 4);
-    this.label.show('ERROR', STATE_COLORS.error, 3.5);
     this.colorTarget.set(STATE_COLORS.error);
     this.colorHoldUntil = clock.now + 1.5;
     if (this.mode !== 'flinch')
@@ -566,7 +553,6 @@ export class Bot {
       startedAt: clock.now,
     };
     if (this.arms) this.arms.L.carried = item.object;
-    this.label.show('DELIVER', STATE_COLORS.completed, 2.5);
     this.mode = 'deliver';
     this.modeAt = clock.now;
     this.activity = null;
@@ -589,7 +575,6 @@ export class Bot {
   }
 
   private celebrate(): void {
-    this.label.show('DONE', STATE_COLORS.completed, 3);
     this.mode = 'celebrate';
     this.modeAt = clock.now;
     this.colorHoldUntil = clock.now + 6;
@@ -1178,10 +1163,6 @@ export class Bot {
     );
 
     this.cone.update(dt, 0.22);
-    this.label.update(
-      dt,
-      tmpB.copy(pos).add(tmpA.set(0, 1.75 * this.scale, 0))
-    );
   }
 
   dispose(): void {
@@ -1193,7 +1174,6 @@ export class Bot {
     this.eye?.dispose();
     scene.remove(this.group);
     this.cone.dispose();
-    this.label.dispose();
     this.plot.clear();
   }
 }

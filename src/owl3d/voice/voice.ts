@@ -97,6 +97,7 @@ export class Voice {
   /** Preferred input by label; '' is the system default. */
   private inputLabel = '';
   private peak = 0;
+  private recordFrom = 0;
   private readonly vad = new VoiceActivityDetector();
   private mic: Mic | null = null;
   private opening: Promise<Mic | null> | null = null;
@@ -332,6 +333,9 @@ export class Voice {
     this.chunks = [];
     this.recorded = 0;
     this.peak = 0;
+    // The start blip plays through the speakers; don't record it.
+    this.recordFrom = performance.now() + 180;
+    this.cue('start');
     this.set('recording');
     if (!this.enabled) void this.enable(this.handsFree);
     const mic = await this.openMic();
@@ -347,21 +351,25 @@ export class Voice {
     this.recorded = 0;
     this.scheduleClose();
     if (audio.length < MIN_CLIP_SECONDS * MIC_RATE) {
+      this.cue('cancel');
       this.set(this.resting());
       return;
     }
     // A clip with no signal at all is a dead or wrong microphone, not silence.
     if (this.peak < 0.001) {
       this.warning = `No sound from ${this.inputName || 'the microphone'}. Pick another mic.`;
+      this.cue('error');
       this.set(this.resting());
       return;
     }
     this.warning = '';
+    this.cue('send');
     this.understand(audio);
   }
 
   private hear(samples: Float32Array): void {
     if (this.recordingNow) {
+      if (performance.now() < this.recordFrom) return;
       this.chunks.push(samples);
       this.recorded += samples.length;
       let sum = 0;
@@ -398,6 +406,55 @@ export class Voice {
       const text = cleanTranscript(raw);
       if (text) this.onHeard?.(text);
     });
+  }
+
+  /* ------------------------------- cues -------------------------------- */
+
+  /**
+   * Short sounds in place of on-screen text: a rising blip when recording
+   * starts, a falling one when your words are sent, a soft low tone for a
+   * tap too short to count, and a low double buzz when the mic is silent.
+   */
+  cue(kind: 'start' | 'send' | 'cancel' | 'error'): void {
+    try {
+      this.output ??= new AudioContext();
+      const output = this.output;
+      if (output.state === 'suspended') void output.resume();
+      const notes: Record<typeof kind, Array<[number, number, number]>> = {
+        start: [
+          [660, 0, 0.07],
+          [990, 0.08, 0.09],
+        ],
+        send: [
+          [880, 0, 0.07],
+          [560, 0.08, 0.11],
+        ],
+        cancel: [[330, 0, 0.09]],
+        error: [
+          [196, 0, 0.12],
+          [196, 0.17, 0.12],
+        ],
+      };
+      const start = output.currentTime + 0.01;
+      for (const [frequency, offset, length] of notes[kind]) {
+        const tone = output.createOscillator();
+        const gain = output.createGain();
+        tone.type = kind === 'error' ? 'square' : 'sine';
+        tone.frequency.value = frequency;
+        const at = start + offset;
+        gain.gain.setValueAtTime(0, at);
+        gain.gain.linearRampToValueAtTime(
+          kind === 'error' ? 0.035 : 0.07,
+          at + 0.01
+        );
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+        tone.connect(gain).connect(output.destination);
+        tone.start(at);
+        tone.stop(at + length + 0.02);
+      }
+    } catch {
+      /* cues are a nicety */
+    }
   }
 
   /* ------------------------------- mouth ------------------------------- */

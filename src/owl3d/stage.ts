@@ -20,5 +20,3 @@ export function pick<T>(items: readonly T[]): T {
   if (item === undefined) throw new Error('pick() from an empty list');
   return item;
 }
-export const cssColor = (hex: number): string =>
-  `#${new THREE.Color(hex).getHexString()}`;

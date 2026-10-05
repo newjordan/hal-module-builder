@@ -104,21 +104,21 @@ Each live agent gets its own bot (up to four) with a colored identity band and
 its own build plot. HAL embodies the first agent and stays home when the last
 one leaves.
 
-## Everything lives in the room
+## Everything lives in the room, and it talks
 
-Nothing is drawn on top of the 3D scene. The Shift's 3D is weakest toward
-its edges, so the corners stay dark (a vignette at the glass), HAL steers
-away from them, and every control and word is an object in the room:
+The portal shows no text: it is a feedback and audio system. Nothing is
+drawn on top of the 3D scene, the corners stay dark (a vignette at the glass;
+the Shift's 3D is weakest at its edges), and HAL steers away from them.
 
-- **Talk:** the big red dome on the desk's left. Hold it (or HAL itself) to
-  talk; it sinks, pulses and glows with your voice, and blinks amber when the
-  microphone gives no sound.
-- **Stop:** the block on the desk's right lights up while HAL speaks; press
-  it (or HAL) to cut it off.
-- **Words:** a hologram projected from the desk shows what HAL is doing in two
-  huge words (WORKING · RUN) and, during conversation, subtitles a few huge
-  words at a time. HAL comes to center stage above it to talk with you.
-- Bots float one huge word per event (RUN, EDIT, SEARCH, DONE…).
+- **Talk:** the big red dome on the desk. Hold it (or HAL itself) to talk; a
+  rising blip says it is recording, a falling blip that your words were sent,
+  a low double buzz (and an amber blinking dome) that the mic heard nothing.
+- **Stop:** the block on the desk lights up while HAL speaks; press it (or
+  HAL) to cut it off.
+- **The waveform:** light bars projected from the desk show the conversation
+  as sound: your voice in cyan, HAL's in red, a slow pulse in HAL's state
+  color while it works, near flat when idle. HAL comes to center stage above
+  it to talk with you.
 
 Presses are ray-cast into the scene (from the matching eye in stereo). The
 microphone choice and hands-free listening are in the menu bar menu.

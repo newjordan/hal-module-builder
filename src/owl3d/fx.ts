@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ROOM } from './config';
-import { clock, cssColor, damp, pick, rand, scene } from './stage';
+import { damp, pick, rand, scene } from './stage';
 
 /* ----------------------------- textures ----------------------------- */
 
@@ -240,77 +240,5 @@ export class Beam {
   dispose(): void {
     scene.remove(this.mesh);
     this.mesh.material.dispose();
-  }
-}
-
-/* -------------------------------- text ------------------------------ */
-
-export const UI_FONT = '-apple-system, "SF Pro Text", Helvetica, sans-serif';
-export const MONO_FONT = '"SF Mono", Menlo, monospace';
-
-export interface TextSurface {
-  canvas: HTMLCanvasElement;
-  g: CanvasRenderingContext2D;
-  texture: THREE.CanvasTexture;
-}
-
-export function textSurface(width: number, height: number): TextSurface {
-  const [canvas, g] = makeCanvas(width, height);
-  return { canvas, g, texture: canvasTexture(canvas) };
-}
-
-/** A pill-shaped caption that floats above a bot. */
-export class Label {
-  private readonly surface = textSurface(1024, 240);
-  readonly sprite: THREE.Sprite;
-  private until = 0;
-
-  constructor() {
-    this.sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: this.surface.texture,
-        transparent: true,
-        depthWrite: false,
-        opacity: 0,
-      })
-    );
-    // One chunky word (RUN, EDIT, DONE…): huge enough to read on the Shift.
-    this.sprite.scale.set(4.6, 1.08, 1);
-    scene.add(this.sprite);
-  }
-
-  show(text: string, color: number, seconds: number): void {
-    const { canvas, g, texture } = this.surface;
-    g.clearRect(0, 0, canvas.width, canvas.height);
-    g.font = `800 150px ${UI_FONT}`;
-    const width = Math.min(canvas.width - 20, g.measureText(text).width + 110);
-    const x = (canvas.width - width) / 2;
-    g.fillStyle = 'rgba(6,9,12,0.78)';
-    g.strokeStyle = cssColor(color);
-    g.lineWidth = 12;
-    g.beginPath();
-    g.roundRect(x, 20, width, 200, 100);
-    g.fill();
-    g.stroke();
-    g.fillStyle = '#eef1f3';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(text, canvas.width / 2, 124, width - 70);
-    texture.needsUpdate = true;
-    this.until = clock.now + seconds;
-  }
-
-  update(dt: number, position: THREE.Vector3): void {
-    this.sprite.position.copy(position);
-    const material = this.sprite.material;
-    const target = clock.now < this.until ? 1 : 0;
-    material.opacity += (target - material.opacity) * damp(8, dt);
-    this.sprite.visible = material.opacity > 0.01;
-  }
-
-  dispose(): void {
-    scene.remove(this.sprite);
-    this.sprite.material.dispose();
-    this.surface.texture.dispose();
   }
 }

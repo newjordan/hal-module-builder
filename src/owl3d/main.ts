@@ -35,7 +35,6 @@ import { Desk, Hatch } from './station';
 import { clock, scene } from './stage';
 import { Voice, type VoiceState } from './voice/voice';
 import { buildRoom, createDust, gridUniforms } from './world';
-import { eventWord, stateWord } from './words';
 
 /* Host API from the Electron shell (electron/owl3d/preload.cjs). */
 interface SpokenLine {
@@ -102,8 +101,6 @@ buildRoom();
 const station: Station = { desk: new Desk(), hatch: new Hatch() };
 const updateDust = createDust();
 const voice = new Voice();
-/** The latest action word (RUN, EDIT…) for the desk hologram. */
-let lastAction = '';
 /**
  * Push-to-talk, shared by the ● button, the . key and ⌘⌥.: hold to talk and
  * release to send, or tap to start and tap again to send.
@@ -353,8 +350,6 @@ function handleEvent(event: PortalEvent): void {
     return;
   }
   bot.apply(event);
-  const word = event.replay ? null : eventWord(event);
-  if (word) lastAction = word;
 }
 
 let connection: ConnectionLabel = 'connecting';
@@ -420,14 +415,12 @@ voice.onChange = () => {
 };
 
 voice.onHeard = text => {
-  station.desk.subtitle(text, 0x53d8df);
   if (host?.heard) host.heard(text);
   else console.info('[owl3d] heard:', text);
 };
 
 host?.onSpeak?.(line => {
   if (line.agentId && bots.has(line.agentId)) voiceAgent = line.agentId;
-  station.desk.subtitle(line.text, 0xff625f);
   const audio = line.audio.buffer.slice(
     line.audio.byteOffset,
     line.audio.byteOffset + line.audio.byteLength
@@ -564,28 +557,30 @@ function frame(time: number): void {
     bot.facingViewer = engaged;
     bot.voiceLevel = !engaged ? 0 : talking ? voice.outLevel : voice.micLevel;
   }
-  if (talking) station.desk.holdSubtitle(0.8);
   station.desk.setVoice({
     recording: voice.state === 'recording',
     speaking: talking,
     level: voice.state === 'recording' ? voice.micLevel : 0,
+    halLevel: talking ? voice.outLevel : 0,
     noMic: Boolean(voice.warning),
     ready:
       voice.state !== 'off' &&
       voice.state !== 'loading' &&
       voice.state !== 'error',
   });
-  // The hologram's resting words: what the agent in focus is doing.
+  // Between conversations the hologram pulses with what the agent in focus
+  // is doing.
   const focus = partner ?? bots.values().next().value;
-  const resting =
-    !focus ||
-    !settings.hud ||
-    focus.state === 'idle' ||
-    focus.state === 'offline';
-  station.desk.status(
-    resting || !focus ? '' : stateWord(focus.state),
-    resting ? '' : lastAction,
-    focus ? STATE_COLORS[focus.state] : 0
+  const busy = Boolean(
+    focus &&
+      settings.hud &&
+      focus.state !== 'idle' &&
+      focus.state !== 'offline' &&
+      focus.state !== 'completed'
+  );
+  station.desk.activity(
+    focus ? STATE_COLORS[focus.state] : STATE_COLORS.idle,
+    busy
   );
   updateDust(now, dt);
   worldModels.forEach(model => {
@@ -682,7 +677,6 @@ const voiceHooks = {
   },
   /** Speak through the browser voice (no shell). */
   say(text: string): Promise<void> {
-    station.desk.subtitle(text, 0xff625f);
     return voice.say(text);
   },
   get state(): VoiceState {

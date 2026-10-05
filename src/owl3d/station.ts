@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import { ROOM, STATE_COLORS } from './config';
-import { UI_FONT, glowSprite, textSurface } from './fx';
+import { glowSprite } from './fx';
 import { ModelInstance } from './models';
 import { partInstance } from './rig';
-import { clamp, clock, cssColor, damp, scene } from './stage';
-import { captionPages } from './words';
+import { clamp, clock, damp, scene } from './stage';
 import { gridUniforms } from './world';
 
 /**
@@ -18,6 +17,14 @@ import { gridUniforms } from './world';
 export const DESK = { x: 0, z: -1.8, top: ROOM.floor + 0.9 } as const;
 const SLOTS_X = [-1.32, -0.44, 0.44, 1.32];
 const SLOTS_Z = [-0.75, -0.1];
+/** The waveform hologram: bars across this width, up to this tall. */
+const WAVE_BARS = 64;
+const WAVE_WIDTH = 5.6;
+const WAVE_HEIGHT = 1.5;
+const waveMatrix = new THREE.Matrix4();
+const waveCursor = new THREE.Vector3();
+const waveTurn = new THREE.Quaternion();
+const waveScale = new THREE.Vector3();
 /** Where the talk and stop buttons sit on the desk's front corners. */
 const BUTTON_X = 2.3;
 const BUTTON_Z = 0.5;
@@ -36,6 +43,8 @@ export interface DeskVoice {
   speaking: boolean;
   /** 0..1 microphone level while recording. */
   level: number;
+  /** 0..1 HAL's voice level while it speaks. */
+  halLevel: number;
   /** The last recording had no sound at all. */
   noMic: boolean;
   /** Voice is loaded and ready for a press. */
@@ -52,19 +61,20 @@ const metal = () =>
 /**
  * The cyberdesk in the foreground. Everything you interact with is on it:
  * a big red dome to hold while you talk to HAL, a stop block that lights up
- * while HAL is speaking, a hologram projected from its emitter bar (status
- * words and subtitles, a few huge words at a time), and the cartridges HAL
+ * while HAL is speaking, a hologram of light bars projected from its emitter
+ * bar that shows the conversation as sound (no text), and the cartridges HAL
  * delivers when a job is done.
  */
 export class Desk {
   readonly talkButton = new THREE.Group();
   readonly stopButton = new THREE.Group();
   private readonly desk: ReturnType<typeof partInstance>;
-  private readonly hologram: THREE.Mesh<
-    THREE.PlaneGeometry,
+  /** The hologram above the desk: an audio waveform, no text. */
+  private readonly wave: THREE.InstancedMesh<
+    THREE.BoxGeometry,
     THREE.MeshBasicMaterial
   >;
-  private readonly surface = textSurface(2048, 648);
+  private readonly history = new Float32Array(WAVE_BARS / 2);
   private readonly talkCap: THREE.Mesh<
     THREE.SphereGeometry,
     THREE.MeshStandardMaterial
@@ -82,23 +92,19 @@ export class Desk {
     { length: SLOTS_X.length * SLOTS_Z.length },
     () => null
   );
-  private delivered = 0;
   private next = 0;
   private pressed: 'talk' | 'stop' | null = null;
   private voice: DeskVoice = {
     recording: false,
     speaking: false,
     level: 0,
+    halLevel: 0,
     noMic: false,
     ready: false,
   };
-  private statusText: [string, string, number] = ['', '', 0];
-  private pages: string[][] = [];
-  private pageColor = 0xff625f;
-  private pageStart = 0;
-  private pageDuration = 0;
-  private pageUntil = 0;
-  private drawn = '';
+  private activityColor = new THREE.Color(0x53d8df);
+  private busy = false;
+  private readonly waveColor = new THREE.Color();
 
   constructor() {
     this.desk = partInstance('desk', () => {
@@ -109,21 +115,23 @@ export class Desk {
     this.desk.object.position.set(DESK.x, ROOM.floor, DESK.z);
     scene.add(this.desk.object);
 
-    // The hologram: projected up from the emitter bar, center stage.
-    this.hologram = new THREE.Mesh(
-      new THREE.PlaneGeometry(6, 1.9),
+    // The hologram: a waveform of light bars projected up from the emitter
+    // bar, center stage. Your voice in cyan, HAL's in red, a slow pulse
+    // while HAL works, near flat when idle.
+    this.wave = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.075, 1, 0.03),
       new THREE.MeshBasicMaterial({
-        map: this.surface.texture,
+        color: 0xffffff,
         transparent: true,
+        opacity: 0.85,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        side: THREE.DoubleSide,
-      })
+      }),
+      WAVE_BARS
     );
-    this.hologram.position.set(DESK.x, DESK.top + 1.55, DESK.z - 1.05);
-    this.hologram.rotation.x = -0.08;
-    this.hologram.renderOrder = 12;
-    scene.add(this.hologram);
+    this.wave.position.set(DESK.x, DESK.top + 1.45, DESK.z - 1.05);
+    this.wave.renderOrder = 12;
+    scene.add(this.wave);
 
     // Talk: a big red dome. Hold it to talk to HAL.
     const talkBase = new THREE.Mesh(
@@ -236,7 +244,6 @@ export class Desk {
     item.object.position.copy(spot);
     item.object.quaternion.identity();
     item.born = clock.now;
-    this.delivered++;
     return spot;
   }
 
@@ -252,81 +259,54 @@ export class Desk {
 
   /* ----------------------------- hologram ----------------------------- */
 
-  /** The hologram's resting content: what HAL is doing, in two words. */
-  status(word: string, action: string, color: number): void {
-    this.statusText = [word, action, color];
+  /** What the agent in focus is doing: color, and whether it is busy. */
+  activity(color: number, busy: boolean): void {
+    this.activityColor.set(color);
+    this.busy = busy;
   }
 
-  /** Subtitles: a few huge words at a time, paged while they are spoken. */
-  subtitle(text: string, color: number, seconds?: number): void {
-    this.pages = captionPages(text, 16, 2);
-    this.pageColor = color;
-    const words = text.split(/\s+/).length;
-    this.pageDuration = seconds ?? clamp(1.2 + words * 0.38, 2.5, 40);
-    this.pageStart = clock.now;
-    this.pageUntil = this.pageStart + this.pageDuration + 1.2;
-  }
-
-  /** Keep subtitles up while HAL is still talking. */
-  holdSubtitle(seconds: number): void {
-    this.pageUntil = Math.max(this.pageUntil, clock.now + seconds);
-  }
-
-  get subtitling(): boolean {
-    return clock.now < this.pageUntil && this.pages.length > 0;
-  }
-
-  private drawHologram(): void {
-    let key: string;
-    let lines: string[];
-    let color: number;
-    let size: number;
-    if (this.subtitling) {
-      const per = this.pageDuration / this.pages.length;
-      const index = Math.min(
-        this.pages.length - 1,
-        Math.floor((clock.now - this.pageStart) / Math.max(per, 1.4))
-      );
-      lines = this.pages[index] ?? [];
-      color = this.pageColor;
-      size = 230;
-      key = `sub|${index}|${lines.join('/')}|${color}`;
+  /**
+   * One frame of the waveform: the newest level enters at the center and
+   * ripples outward, mirrored, so speech reads as waves of light.
+   */
+  private drawWave(dt: number): void {
+    const { recording, speaking, level, halLevel } = this.voice;
+    let input: number;
+    let color: number | THREE.Color;
+    if (recording) {
+      input = 0.08 + level * 1.1;
+      color = 0x53d8df;
+    } else if (speaking) {
+      input = 0.06 + halLevel * 1.15;
+      color = 0xff625f;
+    } else if (this.busy) {
+      input = 0.12 + 0.1 * (0.5 + 0.5 * Math.sin(clock.now * 3.2));
+      color = this.activityColor;
     } else {
-      const [word, action, statusColor] = this.statusText;
-      lines = word
-        ? [word, action].filter(Boolean)
-        : this.delivered
-          ? [`✓ ${this.delivered}`]
-          : [];
-      color = word ? statusColor : 0x62d995;
-      size = 250;
-      key = `status|${lines.join('/')}|${color}`;
+      input = 0.025 + 0.02 * Math.sin(clock.now * 1.3);
+      color = this.activityColor;
     }
-    if (key === this.drawn) return;
-    this.drawn = key;
-    const { canvas, g, texture } = this.surface;
-    g.clearRect(0, 0, canvas.width, canvas.height);
-    if (!lines.length) {
-      texture.needsUpdate = true;
-      return;
+    this.waveColor.lerp(new THREE.Color(color), damp(8, dt));
+    this.wave.material.color.copy(this.waveColor);
+    // Shift the history outward a little each frame and feed the center.
+    const history = this.history;
+    for (let i = history.length - 1; i > 0; i--)
+      history[i] = history[i - 1] ?? 0;
+    const head = history[0] ?? 0;
+    history[0] = head + (Math.min(1.4, input) - head) * damp(20, dt);
+    const half = history.length;
+    const spacing = WAVE_WIDTH / WAVE_BARS;
+    for (let i = 0; i < WAVE_BARS; i++) {
+      const fromCenter = i < half ? half - 1 - i : i - half;
+      const height = Math.max(0.03, (history[fromCenter] ?? 0) * WAVE_HEIGHT);
+      waveMatrix.compose(
+        waveCursor.set((i - (WAVE_BARS - 1) / 2) * spacing, 0, 0),
+        waveTurn,
+        waveScale.set(1, height, 1)
+      );
+      this.wave.setMatrixAt(i, waveMatrix);
     }
-    // Scanlines sell the hologram.
-    g.fillStyle = 'rgba(83,216,223,0.05)';
-    for (let y = 0; y < canvas.height; y += 8)
-      g.fillRect(0, y, canvas.width, 3);
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.font = `800 ${size}px ${UI_FONT}`;
-    const tint = cssColor(color);
-    lines.forEach((line, i) => {
-      const y = lines.length === 1 ? canvas.height / 2 : 170 + i * 300;
-      g.fillStyle = this.subtitling ? '#ffffff' : i === 0 ? tint : '#eef1f3';
-      g.fillText(line, canvas.width / 2, y, canvas.width - 80);
-    });
-    // Speaker or state color as a bar under the words.
-    g.fillStyle = tint;
-    g.fillRect(canvas.width * 0.3, canvas.height - 26, canvas.width * 0.4, 14);
-    texture.needsUpdate = true;
+    this.wave.instanceMatrix.needsUpdate = true;
   }
 
   update(dt: number, glow: THREE.Color, energy: number): void {
@@ -378,15 +358,15 @@ export class Desk {
       ((speaking ? 1.6 : 0.05) - this.stopCap.material.emissiveIntensity) *
       damp(8, dt);
 
-    this.drawHologram();
+    this.drawWave(dt);
   }
 
   dispose(): void {
     this.desk.model?.dispose();
     this.desk.object.removeFromParent();
-    this.hologram.removeFromParent();
-    this.hologram.material.dispose();
-    this.surface.texture.dispose();
+    this.wave.removeFromParent();
+    this.wave.geometry.dispose();
+    this.wave.material.dispose();
     this.talkButton.removeFromParent();
     this.stopButton.removeFromParent();
     for (const item of this.items) {
