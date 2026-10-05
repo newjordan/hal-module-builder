@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:live": "node scripts/dev-live.mjs",
     "bridge": "node scripts/agent-bridge.mjs",
-    "owl3d": "npm run owl3d:build && electron electron/owl3d/main.cjs",
+    "owl3d": "VITE_HAL_AGENT_WS_URL=ws://127.0.0.1:8765/hal-agent-events vite build && electron electron/owl3d/main.cjs",
     "owl3d:build": "VITE_HAL_AGENT_WS_URL=ws://127.0.0.1:8765/hal-agent-events vite build",
     "owl3d:dev": "electron electron/owl3d/main.cjs --dev",
     "owl3d:kit": "${BLENDER:-blender} -b --factory-startup -P blender/build_owl3d_kit.py",

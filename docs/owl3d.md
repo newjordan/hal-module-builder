@@ -20,6 +20,8 @@ npm run owl3d        # build, then start the always-on shell
 npm run owl3d:dev    # the shell against the Vite dev server (hot reload)
 ```
 
+Bun works too, with no Node installed: `bun install && bun run owl3d`.
+
 The shell (`electron/owl3d/main.cjs`):
 
 - finds the display named Owl3D / Shift (or the one picked in the tray) and
