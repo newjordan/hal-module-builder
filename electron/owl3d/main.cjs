@@ -107,7 +107,7 @@ function loadSettings() {
     settings = { ...DEFAULTS };
   }
   const mode = process.argv.find(arg => arg.startsWith('--mode='));
-  if (mode) settings.mode = mode.endsWith('window') ? 'window' : 'sbs';
+  if (mode) settings.mode = mode.endsWith('window') ? 'window' : mode.endsWith('full') ? 'full' : 'sbs';
 }
 
 function saveSettings() {
@@ -157,7 +157,7 @@ function flatDisplay() {
 function placePortal() {
   if (!portal) return;
   const { bounds, workArea } = owlDisplay();
-  if (settings.mode === 'sbs') {
+  if (settings.mode === 'sbs' || settings.mode === 'full') {
     // The panel splits the whole signal into two eyes, so the portal must
     // own every pixel of the display, menu bar included.
     portal.setBounds(bounds);
@@ -400,6 +400,13 @@ function rebuildTray() {
         click: () => update({ mode: 'sbs' }),
       },
       {
+        label: 'Full Screen 2D (for Owl3D Live 3D)',
+        type: 'radio',
+        checked: settings.mode === 'full',
+        accelerator: 'Command+Alt+F',
+        click: () => update({ mode: 'full' }),
+      },
+      {
         label: 'Floating window (2D)',
         type: 'radio',
         checked: settings.mode === 'window',
@@ -627,6 +634,9 @@ app.whenReady().then(async () => {
   rebuildTray();
   globalShortcut.register('CommandOrControl+Alt+H', () =>
     update({ mode: settings.mode === 'sbs' ? 'window' : 'sbs' })
+  );
+  globalShortcut.register('CommandOrControl+Alt+F', () =>
+    update({ mode: settings.mode === 'full' ? 'window' : 'full' })
   );
   globalShortcut.register('CommandOrControl+Alt+M', () =>
     update({ voice: true, handsFree: !settings.handsFree })

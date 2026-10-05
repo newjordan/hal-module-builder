@@ -193,7 +193,9 @@ function loadSettings(): PortalSettings {
     return {
       ...DEFAULT_SETTINGS,
       ...(typeof stored === 'object' && stored ? stored : {}),
-      ...(mode === 'sbs' || mode === 'window' ? { mode } : {}),
+      ...(mode === 'sbs' || mode === 'full' || mode === 'window'
+        ? { mode }
+        : {}),
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -469,7 +471,9 @@ window.addEventListener('keydown', event => {
       updateSettings({ voice: true, handsFree: !settings.handsFree });
       break;
     case 'f':
-      if (!host)
+      if (host)
+        updateSettings({ mode: settings.mode === 'full' ? 'window' : 'full' });
+      else if (!host)
         void (document.fullscreenElement
           ? document.exitFullscreen()
           : document.documentElement.requestFullscreen());

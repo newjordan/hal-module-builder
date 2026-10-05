@@ -19,7 +19,8 @@
         height: 100vh;
       }
       /* In stereo the pointer hides when idle; move the mouse to get it back. */
-      body[data-mode='sbs'].pointer-idle {
+      body[data-mode='sbs'].pointer-idle,
+      body[data-mode='full'].pointer-idle {
         cursor: none;
       }
       /* Voice dock (src/owl3d/voice/dock.ts); drawn once per eye in stereo. */

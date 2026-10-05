@@ -72,6 +72,7 @@ convergence are adjustable.
 | Key | Action |
 | --- | --- |
 | `S` / `Esc` | Stereo full screen / floating window |
+| `F`, `⌘⌥F` | Full-screen 2D (for Owl3D's Live 3D) / floating window |
 | `[` `]` | Less / more depth |
 | `-` `=` | Push the zero-parallax plane in / out |
 | `E` | Swap eyes |

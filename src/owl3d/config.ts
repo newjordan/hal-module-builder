@@ -57,7 +57,8 @@ export function toolColor(name = ''): number {
   return 0xb0b8c8;
 }
 
-export type PortalMode = 'sbs' | 'window';
+/** 'sbs' full-screen stereo, 'full' full-screen 2D (for Owl3D Live 3D), 'window' floating. */
+export type PortalMode = 'sbs' | 'full' | 'window';
 
 export interface PortalSettings {
   mode: PortalMode;
