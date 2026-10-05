@@ -15,12 +15,13 @@ export const D = (W * VIEWING_CM) / PANEL_WIDTH_CM;
 /** 6.4 cm between the eyes, in world units. */
 export const EYE_SEPARATION = (W * 6.4) / PANEL_WIDTH_CM;
 export const ROOM = { x: 8, floor: -4.5, ceil: 4.5, back: -26 } as const;
+/** Where bots may fly: back from the glass and in from the walls. */
 export const BOUNDS = {
-  x: 6.4,
-  yMin: -3.4,
-  yMax: 3.3,
-  zMin: -21,
-  zMax: 3.6,
+  x: 5.2,
+  yMin: -3.2,
+  yMax: 3.0,
+  zMin: -22,
+  zMax: 0.8,
 } as const;
 export const BACKGROUND = 0x030406;
 export const MAX_BOTS = 4;
@@ -69,7 +70,6 @@ export interface PortalSettings {
   swapEyes: boolean;
   /** Each half is stretched to full width by the panel (the Owl3D Shift does). */
   squeeze: boolean;
-  hud: boolean;
   /** Voice on: talk to HAL (push-to-talk) and hear it answer. */
   voice: boolean;
   /** Listen all the time instead of push-to-talk. */
@@ -86,7 +86,6 @@ export const DEFAULT_SETTINGS: PortalSettings = {
   convergence: 0,
   swapEyes: false,
   squeeze: true,
-  hud: true,
   voice: false,
   handsFree: false,
   micLabel: '',

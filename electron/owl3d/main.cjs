@@ -47,7 +47,6 @@ const DEFAULTS = {
   convergence: 0,
   swapEyes: false,
   squeeze: true,
-  hud: true,
   displayId: null,
   voice: true,
   // Push-to-talk unless this is on.
@@ -417,7 +416,6 @@ function rebuildTray() {
       { type: 'separator' },
       toggle('Swap eyes', 'swapEyes'),
       toggle('Anamorphic halves', 'squeeze'),
-      toggle('Show HUD', 'hud'),
       toggle('Keep Stereo on Top', 'stereoOnTop'),
       { label: 'Talk to HAL (start / send)', accelerator: 'Command+Alt+.', click: pushToTalk },
       toggle('Voice', 'voice'),

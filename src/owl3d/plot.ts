@@ -6,10 +6,10 @@ import { clamp, clock, pick, scene } from './stage';
 
 /** Where each bot builds; slot index → plot center on the floor. */
 export const PLOTS = [
-  { cx: 4.4, cz: -11 },
-  { cx: -4.4, cz: -11 },
-  { cx: 4.4, cz: -17.5 },
-  { cx: -4.4, cz: -17.5 },
+  { cx: 3.9, cz: -12 },
+  { cx: -3.9, cz: -12 },
+  { cx: 3.9, cz: -18.5 },
+  { cx: -3.9, cz: -18.5 },
 ] as const;
 
 const CELL = 1.25;
@@ -51,10 +51,10 @@ export class Block {
       this.model.root.position.y = -BLOCK / 2;
       holder.add(this.model.root);
       this.object = holder;
-      for (const material of this.model.materials()) {
-        const copy = material as Fadeable;
-        copy.transparent = true;
-        this.fade.push(copy);
+      for (const material of this.model.ownMaterials()) {
+        const fadeable = material as Fadeable;
+        fadeable.transparent = true;
+        this.fade.push(fadeable);
         if (material instanceof THREE.MeshStandardMaterial)
           this.glow.push(material);
       }

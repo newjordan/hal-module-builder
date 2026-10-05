@@ -38,7 +38,7 @@
       "id": "pylon",
       "file": "pylon.glb",
       "attach": "world",
-      "position": [-6.6, -4.5, -22],
+      "position": [-5.2, -4.5, -22],
       "scale": 0.9,
       "clips": { "*": "Idle" }
     }

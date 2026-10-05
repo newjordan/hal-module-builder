@@ -222,10 +222,13 @@ async function refreshInputs(): Promise<void> {
     /* no devices to list yet */
   }
 }
-navigator.mediaDevices?.addEventListener(
-  'devicechange',
-  () => void refreshInputs()
-);
+// Listing devices enumerates cameras too (the Shift's eye-tracking camera
+// among them), so do it rarely: once things settle after a change.
+let inputsTimer = 0;
+navigator.mediaDevices?.addEventListener('devicechange', () => {
+  window.clearTimeout(inputsTimer);
+  inputsTimer = window.setTimeout(() => void refreshInputs(), 2000);
+});
 
 // In stereo the pointer hides after a moment; any movement brings it back.
 let pointerTimer = 0;
@@ -262,11 +265,17 @@ function loadSettings(): PortalSettings {
 
 let settings = loadSettings();
 
+let inputsListed = false;
 function applySettings(next: Partial<PortalSettings>): void {
+  const micChanged =
+    next.micLabel !== undefined && next.micLabel !== settings.micLabel;
   settings = { ...settings, ...next };
   document.body.dataset.mode = settings.mode;
   voice.setInput(settings.micLabel);
-  void refreshInputs();
+  if (micChanged || !inputsListed) {
+    inputsListed = true;
+    void refreshInputs();
+  }
   if (settings.voice) void voice.enable(settings.handsFree);
   else if (voice.state !== 'off') voice.disable();
 }
@@ -476,9 +485,6 @@ window.addEventListener('keydown', event => {
       break;
     case 'a':
       updateSettings({ squeeze: !settings.squeeze });
-      break;
-    case 'h':
-      updateSettings({ hud: !settings.hud });
       break;
     case '[':
       updateSettings({

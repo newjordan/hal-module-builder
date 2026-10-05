@@ -14,7 +14,7 @@ import { gridUniforms } from './world';
 
 /* ------------------------------- desk -------------------------------- */
 
-export const DESK = { x: 0, z: -1.8, top: ROOM.floor + 0.9 } as const;
+export const DESK = { x: 0, z: -4.6, top: ROOM.floor + 0.9 } as const;
 const SLOTS_X = [-1.32, -0.44, 0.44, 1.32];
 const SLOTS_Z = [-0.75, -0.1];
 /** Where the talk and stop buttons sit on the desk's front corners. */
@@ -282,7 +282,7 @@ export class Desk {
 
 /* -------------------------- hatch and core --------------------------- */
 
-export const HATCH = { x: 0, z: -14, half: 1.5 } as const;
+export const HATCH = { x: 0, z: -15, half: 1.5 } as const;
 const PIT = { width: 5.2, depth: 3.6 } as const;
 /** The core rises this far above the floor when the hatch is open. */
 const CORE_RISE = 1.3;

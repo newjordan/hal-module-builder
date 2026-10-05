@@ -60,6 +60,8 @@ export class ModelInstance {
   private readonly mixer: THREE.AnimationMixer | null;
   private readonly actions = new Map<string, THREE.AnimationAction>();
   private readonly tinted: THREE.MeshStandardMaterial[];
+  /** Clones made by ownMaterials(), disposed with this copy. */
+  private readonly owned: THREE.Material[] = [];
   private current: string | null = null;
   private orbitAngle = Math.random() * Math.PI * 2;
 
@@ -139,6 +141,33 @@ export class ModelInstance {
     return found;
   }
 
+  /**
+   * Give this copy its own materials so it can fade or flash alone: clones
+   * share the loaded model's materials, so fading one block would otherwise
+   * fade every block built from that model.
+   */
+  ownMaterials(): THREE.Material[] {
+    const clones = new Map<THREE.Material, THREE.Material>();
+    const own = (material: THREE.Material): THREE.Material => {
+      if (this.tinted.some(tinted => tinted === material)) return material;
+      let clone = clones.get(material);
+      if (!clone) {
+        clone = material.clone();
+        clones.set(material, clone);
+        this.owned.push(clone);
+      }
+      return clone;
+    };
+    this.root.traverse(child => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(own)
+        : own(mesh.material);
+    });
+    return this.materials();
+  }
+
   /** Materials for fading/flashing build blocks. */
   materials(): THREE.Material[] {
     const all: THREE.Material[] = [];
@@ -159,6 +188,7 @@ export class ModelInstance {
     this.mixer?.stopAllAction();
     this.root.removeFromParent();
     this.tinted.forEach(material => material.dispose());
+    this.owned.forEach(material => material.dispose());
   }
 }
 

@@ -77,7 +77,6 @@ convergence are adjustable.
 | `-` `=` | Push the zero-parallax plane in / out |
 | `E` | Swap eyes |
 | `A` | Anamorphic halves on/off |
-| `H` | HUD on/off |
 | `D` | Play the demo shift |
 | `.` (hold) | Push to talk: hold, speak, release to send (tap to start, tap to send) |
 | `⌘⌥.` | Start / send a recording from anywhere (shell only) |
@@ -86,6 +85,14 @@ convergence are adjustable.
 
 The floating window renders in mono; Owl3D's live 2D→3D conversion can add
 depth to it.
+
+**If Owl3D's 3D stops after about ten seconds**, it can't see the Shift's
+eye-tracking camera: its log (`~/Library/Application Support/Owl3D/logs/renderer.log`)
+says `No Sonix cameras were detected` and `Shift activation contract failed
+at camera`. When the camera still appears in `system_profiler
+SPCameraDataType` but capture fails with `-11800` (device not responding),
+the camera is hung and restarting Owl3D won't revive it: unplug the Shift's
+USB-C cable for a few seconds and plug it back in.
 
 ## What HAL does
 

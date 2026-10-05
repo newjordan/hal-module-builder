@@ -92,7 +92,7 @@ const ARM_MOUNTS = {
 const CABLE_SOCKET = new THREE.Vector3(0, -0.86, -0.1);
 
 /** Center stage, just above the desk hologram: where HAL talks with you. */
-const CONVERSATION_SPOT = new THREE.Vector3(0, 0.5, -3.4);
+const CONVERSATION_SPOT = new THREE.Vector3(0, 0.6, -6.4);
 
 /**
  * Keep a target out of the panel's corners and edges: its on-screen position
@@ -620,23 +620,27 @@ export class Bot {
         target: new THREE.Vector3(
           rand(-BOUNDS.x, BOUNDS.x),
           rand(-2.2, 2.2),
-          rand(-18, -3.5)
+          rand(-19, -6)
         ),
         end: now + 12,
       };
     }
     if (roll < 0.58) {
       const tile = new THREE.Vector3(
-        Math.floor(rand(-7, 7) / 2) * 2 + 1,
+        Math.floor(rand(-6, 6) / 2) * 2 + 1,
         ROOM.floor,
-        Math.floor(rand(-20, -6) / 2) * 2 + 1
+        Math.floor(rand(-21, -8) / 2) * 2 + 1
       );
       return { type: 'inspect', tile, end: now + rand(6, 9) };
     }
     if (roll < 0.74) {
       return {
         type: 'peek',
-        target: new THREE.Vector3(rand(-3, 3), rand(-0.4, 1.2), rand(2.2, 3.4)),
+        target: new THREE.Vector3(
+          rand(-2.5, 2.5),
+          rand(-0.4, 1.2),
+          rand(-0.6, 0.6)
+        ),
         end: now + rand(4, 7),
         roll: rand(-0.35, 0.35),
       };
@@ -645,7 +649,7 @@ export class Bot {
       return { type: 'tend', block: top, end: now + rand(4, 6) };
     return {
       type: 'survey',
-      target: new THREE.Vector3(rand(-4, 4), rand(2.2, 3), rand(-14, -5)),
+      target: new THREE.Vector3(rand(-3.5, 3.5), rand(2.2, 3), rand(-15, -7)),
       end: now + rand(5, 8),
     };
   }
