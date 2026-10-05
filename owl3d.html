@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/hal_lens_1.png" />
+    <title>HAL · Owl3D</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #030406;
+      }
+      #owl3d-view {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      /* Full-screen stereo hides the pointer so it never splits across eyes. */
+      body[data-mode='sbs'] {
+        cursor: none;
+      }
+      /* The floating window has no frame; drag it anywhere. */
+      body[data-mode='window'].in-shell {
+        -webkit-app-region: drag;
+        border-radius: 14px;
+      }
+    </style>
+  </head>
+  <body data-mode="window">
+    <canvas id="owl3d-view"></canvas>
+    <script>
+      if (window.halOwl3d) document.body.classList.add('in-shell');
+    </script>
+    <script type="module" src="/src/owl3d/main.ts"></script>
+  </body>
+</html>

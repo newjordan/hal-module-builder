@@ -4,6 +4,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
+import {
+  CLAUDE_TAIL_BYTES,
+  createClaudeContext,
+  discoverClaudeSessions,
+  normalizeClaudeRecord,
+} from './claude-code-source.mjs';
 
 export function envInt(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -19,13 +25,25 @@ const MAX_SEEN_IDS = 5000;
 const POLL_MS = Math.max(250, envInt(process.env.HAL_POLL_MS, 750));
 const LOOKBACK_MS =
   Math.max(1, envInt(process.env.HAL_LOOKBACK_HOURS, 24)) * 60 * 60 * 1000;
-const WORKSPACE = path.resolve(process.env.HAL_WORKSPACE || process.cwd());
+// HAL_WORKSPACE='*' follows sessions in every workspace.
+const ALL_WORKSPACES = process.env.HAL_WORKSPACE === '*';
+const WORKSPACE = path.resolve(
+  ALL_WORKSPACES ? process.cwd() : process.env.HAL_WORKSPACE || process.cwd()
+);
+export const SOURCES = new Set(
+  (process.env.HAL_SOURCES || 'codex,claude')
+    .split(',')
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean)
+);
+const CLAUDE_LOOKBACK_MS =
+  Math.max(1, envInt(process.env.HAL_CLAUDE_LOOKBACK_MINUTES, 120)) * 60 * 1000;
 const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 const SESSIONS_ROOT = path.join(CODEX_HOME, 'sessions');
 const ALLOWED_ORIGINS = new Set(
   (
     process.env.HAL_ALLOWED_ORIGINS ||
-    'http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173'
+    'http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173,hal://app'
   )
     .split(',')
     .map(value => value.trim())
@@ -610,15 +628,17 @@ async function main() {
     state: 'idle',
     stage: 'intake',
     severity: 'success',
-    title: 'Codex bridge ready',
-    detail: `Watching sanitized Codex activity for ${path.basename(WORKSPACE)}.`,
+    title: 'Agent bridge ready',
+    detail: `Watching sanitized ${[...SOURCES].join(' + ')} activity for ${
+      ALL_WORKSPACES ? 'every workspace' : path.basename(WORKSPACE)
+    }.`,
     timestamp: Date.now(),
     task: 'Session telemetry',
     agent: {
       id: 'hal-codex-bridge',
       name: 'HAL Bridge',
       callsign: 'HAL-IO',
-      role: 'Read-only Codex telemetry',
+      role: 'Read-only agent telemetry',
       model: 'Local sidecar',
       workspace: path.basename(WORKSPACE),
       branch: 'local',
@@ -646,7 +666,7 @@ async function main() {
       tracker.inode = stat.ino;
       tracker.decoder.reset(0);
       tracker.epoch = (tracker.epoch || 0) + 1;
-      tracker.context = createSessionContext(tracker.metadata, tracker.epoch);
+      tracker.context = tracker.createContext(tracker.metadata, tracker.epoch);
     }
     if (stat.size === tracker.position) return;
     let handle;
@@ -667,7 +687,7 @@ async function main() {
         } catch {
           continue;
         }
-        for (const event of normalizeRecord(
+        for (const event of tracker.normalize(
           record,
           tracker.context,
           line.offset
@@ -682,7 +702,34 @@ async function main() {
     }
   };
 
+  const discoverClaude = async () => {
+    const sessions = await discoverClaudeSessions(
+      ALL_WORKSPACES ? '*' : WORKSPACE,
+      Date.now() - Math.min(LOOKBACK_MS, CLAUDE_LOOKBACK_MS)
+    );
+    for (const { file, stat, metadata } of sessions) {
+      if (trackers.has(file)) continue;
+      // Long transcripts start near the tail; the first partial line is
+      // skipped by the JSON parse below.
+      const position = Math.max(0, stat.size - CLAUDE_TAIL_BYTES);
+      const decoder = new JsonlDecoder();
+      decoder.reset(position);
+      trackers.set(file, {
+        file,
+        metadata,
+        context: createClaudeContext(metadata),
+        createContext: createClaudeContext,
+        normalize: normalizeClaudeRecord,
+        position,
+        inode: stat.ino,
+        decoder,
+      });
+    }
+  };
+
   const discover = async () => {
+    if (SOURCES.has('claude')) await discoverClaude();
+    if (!SOURCES.has('codex')) return;
     const files = await discoverJsonl(SESSIONS_ROOT);
     const cutoff = Date.now() - LOOKBACK_MS;
     for (const file of files) {
@@ -696,7 +743,11 @@ async function main() {
       if (stat.mtimeMs < cutoff) continue;
       const first = await readFirstRecord(file);
       const payload = first?.type === 'session_meta' ? first.payload || {} : {};
-      if (!payload.cwd || path.resolve(payload.cwd) !== WORKSPACE) continue;
+      if (
+        !payload.cwd ||
+        (!ALL_WORKSPACES && path.resolve(payload.cwd) !== WORKSPACE)
+      )
+        continue;
       const metadata = {
         sessionId: payload.id || payload.session_id,
         parentAgentId: payload.parent_thread_id || payload.forked_from_id,
@@ -711,6 +762,8 @@ async function main() {
         file,
         metadata,
         context: createSessionContext(metadata),
+        createContext: createSessionContext,
+        normalize: normalizeRecord,
         position: 0,
         inode: stat.ino,
         decoder: new JsonlDecoder(),
@@ -762,7 +815,11 @@ async function main() {
 
   server.on('listening', () => {
     console.log(`[hal-bridge] ws://${HOST}:${PORT}${ROUTE}`);
-    console.log(`[hal-bridge] workspace ${WORKSPACE}`);
+    console.log(
+      `[hal-bridge] sources ${[...SOURCES].join(', ')} · workspace ${
+        ALL_WORKSPACES ? '*' : WORKSPACE
+      }`
+    );
   });
   server.on('error', error => {
     console.error(`[hal-bridge] ${error.message}`);

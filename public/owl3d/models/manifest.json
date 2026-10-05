@@ -1,0 +1,46 @@
+{
+  "models": [
+    {
+      "id": "antenna",
+      "file": "antenna.glb",
+      "attach": "eye.top",
+      "position": [0.18, -0.04, 0],
+      "rotation": [0, 0, -12],
+      "tint": "state",
+      "clips": { "work": "Work", "celebrate": "Celebrate", "*": "Idle" }
+    },
+    {
+      "id": "drone",
+      "file": "drone.glb",
+      "attach": "eye.orbit",
+      "orbitRadius": 1.9,
+      "orbitSpeed": 0.7,
+      "spin": 1.2,
+      "tint": "state",
+      "clips": { "*": "Blink" }
+    },
+    {
+      "id": "server",
+      "file": "server.glb",
+      "attach": "build",
+      "tools": ["Bash", "BashOutput", "shell", "exec_command"],
+      "tint": "tool"
+    },
+    {
+      "id": "page",
+      "file": "page.glb",
+      "attach": "build",
+      "tools": ["Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"],
+      "tint": "tool"
+    },
+    {
+      "id": "pylon",
+      "file": "pylon.glb",
+      "attach": "world",
+      "position": [-6.2, -4.5, -21],
+      "scale": 0.9,
+      "tint": "state",
+      "clips": { "*": "Idle" }
+    }
+  ]
+}

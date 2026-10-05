@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -15,15 +16,22 @@ export default defineConfig(({ mode }) => {
       minify: 'esbuild',
       sourcemap: false,
       rollupOptions: {
+        // The agent console + studio, and the Owl3D stereo portal.
+        input: {
+          main: resolve(__dirname, 'index.html'),
+          owl3d: resolve(__dirname, 'owl3d.html'),
+        },
         output: {
           manualChunks: {
             vendor: ['react', 'react-dom'],
+            three: ['three'],
           },
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]',
         },
       },
-      chunkSizeWarningLimit: 600,
+      // three.js is one ~700 kB chunk, loaded only by owl3d.html.
+      chunkSizeWarningLimit: 800,
       cssMinify: true,
     },
     optimizeDeps: {
