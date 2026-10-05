@@ -86,10 +86,17 @@ export class Voice {
   /** 0..1, HAL's voice while it speaks. */
   outLevel = 0;
   handsFree = false;
+  /** Set when the last recording had no sound: a dead or wrong mic. */
+  warning = '';
+  /** Label of the mic in use (or last used). */
+  inputName = '';
   onChange: (() => void) | null = null;
   onHeard: ((text: string) => void) | null = null;
 
   private enabled = false;
+  /** Preferred input by label; '' is the system default. */
+  private inputLabel = '';
+  private peak = 0;
   private readonly vad = new VoiceActivityDetector();
   private mic: Mic | null = null;
   private opening: Promise<Mic | null> | null = null;
@@ -228,19 +235,41 @@ export class Voice {
 
   /* ---------------------------- microphone ---------------------------- */
 
+  /** Use the input with this label ('' for the system default). */
+  setInput(label: string): void {
+    if (label === this.inputLabel) return;
+    this.inputLabel = label;
+    this.warning = '';
+    if (this.mic && !this.recordingNow) {
+      this.closeMic();
+      if (this.handsFree && this.enabled)
+        void this.openMic().then(() => this.set(this.resting()));
+    }
+    this.onChange?.();
+  }
+
   private openMic(): Promise<Mic | null> {
     window.clearTimeout(this.closeTimer);
     if (this.mic) return Promise.resolve(this.mic);
     this.opening ??= (async () => {
       try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const preferred = this.inputLabel
+          ? devices.find(
+              device =>
+                device.kind === 'audioinput' && device.label === this.inputLabel
+            )
+          : undefined;
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 1,
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
+            ...(preferred ? { deviceId: { exact: preferred.deviceId } } : {}),
           },
         });
+        this.inputName = stream.getAudioTracks()[0]?.label ?? '';
         const context = new AudioContext({ sampleRate: MIC_RATE });
         const url = URL.createObjectURL(
           new Blob([TAP_SOURCE], { type: 'text/javascript' })
@@ -302,6 +331,7 @@ export class Voice {
     this.recordingNow = true;
     this.chunks = [];
     this.recorded = 0;
+    this.peak = 0;
     this.set('recording');
     if (!this.enabled) void this.enable(this.handsFree);
     const mic = await this.openMic();
@@ -320,6 +350,13 @@ export class Voice {
       this.set(this.resting());
       return;
     }
+    // A clip with no signal at all is a dead or wrong microphone, not silence.
+    if (this.peak < 0.001) {
+      this.warning = `No sound from ${this.inputName || 'the microphone'}. Pick another mic.`;
+      this.set(this.resting());
+      return;
+    }
+    this.warning = '';
     this.understand(audio);
   }
 
@@ -329,7 +366,9 @@ export class Voice {
       this.recorded += samples.length;
       let sum = 0;
       for (let i = 0; i < samples.length; i++) sum += (samples[i] ?? 0) ** 2;
-      this.micLevel = Math.min(1, Math.sqrt(sum / samples.length) * 9);
+      const rms = Math.sqrt(sum / samples.length);
+      this.peak = Math.max(this.peak, rms);
+      this.micLevel = Math.min(1, rms * 9);
       if (this.recorded >= MAX_CLIP_SECONDS * MIC_RATE) this.endRecording();
       return;
     }

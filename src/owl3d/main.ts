@@ -141,7 +141,32 @@ const dock = new VoiceDock({
     voice.interrupt();
     host?.stopSpeaking?.();
   },
+  onInput: label => updateSettings({ micLabel: label }),
 });
+
+/** Fill the dock's microphone list (labels need mic permission, granted once). */
+async function refreshInputs(): Promise<void> {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devices.filter(
+      device => device.kind === 'audioinput' && device.label
+    );
+    const fallback = inputs.find(device => device.deviceId === 'default');
+    const options = inputs
+      .filter(device => device.deviceId !== 'default')
+      .map(device => ({
+        label: device.label,
+        isDefault: Boolean(fallback && fallback.label.endsWith(device.label)),
+      }));
+    dock.inputs(options, settings.micLabel);
+  } catch {
+    /* no devices to list yet */
+  }
+}
+navigator.mediaDevices?.addEventListener(
+  'devicechange',
+  () => void refreshInputs()
+);
 dock.render(voice.state, voice.detail, false);
 
 // In stereo the pointer hides after a moment; any movement brings it back.
@@ -183,7 +208,9 @@ function applySettings(next: Partial<PortalSettings>): void {
   hud.mesh.visible = settings.hud;
   hud.touch();
   dock.layout(settings.mode, settings.squeeze);
-  dock.render(voice.state, voice.detail, settings.handsFree);
+  dock.render(voice.state, voice.detail, settings.handsFree, voice.warning);
+  voice.setInput(settings.micLabel);
+  void refreshInputs();
   if (settings.voice) void voice.enable(settings.handsFree);
   else if (voice.state !== 'off') voice.disable();
 }
@@ -370,7 +397,8 @@ voice.onChange = () => {
     showDetail && voice.detail ? `${label} · ${voice.detail}` : label,
     color
   );
-  dock.render(voice.state, voice.detail, settings.handsFree);
+  dock.render(voice.state, voice.detail, settings.handsFree, voice.warning);
+  if (voice.warning) hud.setVoice('MIC SILENT · PICK ANOTHER MIC', 0xff625f);
 };
 
 voice.onHeard = text => {

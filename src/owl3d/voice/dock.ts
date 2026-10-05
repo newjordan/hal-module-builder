@@ -16,6 +16,13 @@ export interface DockCallbacks {
   onRecordUp(): void;
   onHandsFree(): void;
   onStop(): void;
+  /** Pick a microphone by label ('' for the system default). */
+  onInput(label: string): void;
+}
+
+export interface MicOption {
+  label: string;
+  isDefault: boolean;
 }
 
 const LABELS: Record<VoiceState, string> = {
@@ -38,6 +45,7 @@ class DockView {
   private readonly fill = document.createElement('i');
   private readonly handsFree = document.createElement('button');
   private readonly stop = document.createElement('button');
+  private readonly input = document.createElement('select');
 
   constructor(callbacks: DockCallbacks) {
     this.root.className = 'voice-dock';
@@ -86,22 +94,67 @@ class DockView {
     keys.textContent = '. hold · ⌘⌥.';
     keys.title = 'Hold . in this window, or ⌘⌥. anywhere to start and stop';
 
-    this.root.append(this.record, text, meter, this.stop, this.handsFree, keys);
+    this.input.className = 'voice-dock__input';
+    this.input.title = 'Microphone';
+    this.input.setAttribute('aria-label', 'Microphone');
+    this.input.addEventListener('change', () =>
+      callbacks.onInput(this.input.value)
+    );
+
+    this.root.append(
+      this.record,
+      text,
+      meter,
+      this.stop,
+      this.input,
+      this.handsFree,
+      keys
+    );
     document.body.append(this.root);
   }
 
-  render(state: VoiceState, detail: string, handsFree: boolean): void {
+  render(
+    state: VoiceState,
+    detail: string,
+    handsFree: boolean,
+    warning = ''
+  ): void {
     this.root.dataset.state = state;
+    this.root.classList.toggle('has-warning', Boolean(warning));
     this.record.setAttribute('aria-pressed', String(state === 'recording'));
     this.label.textContent = LABELS[state];
     this.detail.textContent =
-      state === 'error' || state === 'loading' ? detail : '';
+      warning || (state === 'error' || state === 'loading' ? detail : '');
     this.stop.hidden = state !== 'speaking';
     this.handsFree.setAttribute('aria-pressed', String(handsFree));
   }
 
   level(value: number): void {
     this.fill.style.transform = `scaleX(${Math.min(1, Math.max(0, value)).toFixed(3)})`;
+  }
+
+  inputs(options: readonly MicOption[], selected: string): void {
+    const fallback = options.find(option => option.isDefault)?.label ?? '';
+    const items: Array<[string, string]> = [
+      ['', `Mic: system default${fallback ? ` (${fallback})` : ''}`],
+      ...options
+        .filter(option => !option.isDefault)
+        .map((option): [string, string] => [
+          option.label,
+          `Mic: ${option.label}`,
+        ]),
+    ];
+    this.input.replaceChildren(
+      ...items.map(([value, text]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        return option;
+      })
+    );
+    this.input.value = items.some(([value]) => value === selected)
+      ? selected
+      : '';
   }
 }
 
@@ -130,8 +183,17 @@ export class VoiceDock {
     });
   }
 
-  render(state: VoiceState, detail: string, handsFree: boolean): void {
-    this.views.forEach(view => view.render(state, detail, handsFree));
+  render(
+    state: VoiceState,
+    detail: string,
+    handsFree: boolean,
+    warning = ''
+  ): void {
+    this.views.forEach(view => view.render(state, detail, handsFree, warning));
+  }
+
+  inputs(options: readonly MicOption[], selected: string): void {
+    this.views.forEach(view => view.inputs(options, selected));
   }
 
   level(value: number): void {

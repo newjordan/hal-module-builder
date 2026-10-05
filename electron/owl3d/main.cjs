@@ -52,6 +52,7 @@ const DEFAULTS = {
   voice: true,
   // Push-to-talk unless this is on.
   handsFree: false,
+  micLabel: '',
   // Off so Owl3D's Stereo 3D Playback can present its woven output on top.
   stereoOnTop: false,
 };

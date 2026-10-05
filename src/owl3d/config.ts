@@ -73,6 +73,8 @@ export interface PortalSettings {
   voice: boolean;
   /** Listen all the time instead of push-to-talk. */
   handsFree: boolean;
+  /** Microphone by label; '' is the system default. */
+  micLabel: string;
 }
 
 export const DEFAULT_SETTINGS: PortalSettings = {
@@ -84,4 +86,5 @@ export const DEFAULT_SETTINGS: PortalSettings = {
   hud: true,
   voice: false,
   handsFree: false,
+  micLabel: '',
 };
