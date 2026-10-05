@@ -261,7 +261,7 @@ export function textSurface(width: number, height: number): TextSurface {
 
 /** A pill-shaped caption that floats above a bot. */
 export class Label {
-  private readonly surface = textSurface(1024, 150);
+  private readonly surface = textSurface(1024, 240);
   readonly sprite: THREE.Sprite;
   private until = 0;
 
@@ -274,27 +274,28 @@ export class Label {
         opacity: 0,
       })
     );
-    this.sprite.scale.set(5.2, 0.76, 1);
+    // One chunky word (RUN, EDIT, DONE…): huge enough to read on the Shift.
+    this.sprite.scale.set(4.6, 1.08, 1);
     scene.add(this.sprite);
   }
 
   show(text: string, color: number, seconds: number): void {
     const { canvas, g, texture } = this.surface;
     g.clearRect(0, 0, canvas.width, canvas.height);
-    g.font = `600 54px ${UI_FONT}`;
-    const width = Math.min(canvas.width - 20, g.measureText(text).width + 70);
+    g.font = `800 150px ${UI_FONT}`;
+    const width = Math.min(canvas.width - 20, g.measureText(text).width + 110);
     const x = (canvas.width - width) / 2;
     g.fillStyle = 'rgba(6,9,12,0.78)';
     g.strokeStyle = cssColor(color);
-    g.lineWidth = 4;
+    g.lineWidth = 12;
     g.beginPath();
-    g.roundRect(x, 22, width, 100, 50);
+    g.roundRect(x, 20, width, 200, 100);
     g.fill();
     g.stroke();
     g.fillStyle = '#eef1f3';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, canvas.width / 2, 74, width - 50);
+    g.fillText(text, canvas.width / 2, 124, width - 70);
     texture.needsUpdate = true;
     this.until = clock.now + seconds;
   }

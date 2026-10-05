@@ -419,6 +419,23 @@ function rebuildTray() {
       toggle('Keep Stereo on Top', 'stereoOnTop'),
       { label: 'Talk to HAL (start / send)', accelerator: 'Command+Alt+.', click: pushToTalk },
       toggle('Voice', 'voice'),
+      {
+        label: 'Microphone',
+        submenu: [
+          {
+            label: 'System Default',
+            type: 'radio',
+            checked: !settings.micLabel,
+            click: () => update({ micLabel: '' }),
+          },
+          ...mics.map(label => ({
+            label,
+            type: 'radio',
+            checked: settings.micLabel === label,
+            click: () => update({ micLabel: label }),
+          })),
+        ],
+      },
       { ...toggle('Hands-free Listening', 'handsFree'), accelerator: 'Command+Alt+M' },
       {
         label: 'Depth',
@@ -598,6 +615,14 @@ ipcMain.on('owl3d:heard', (_event, text) => {
 
 ipcMain.on('owl3d:spoken', (_event, id) => {
   spokenWaiters.get(id)?.();
+});
+
+// The portal reports the Mac's microphones; the menu lists them.
+let mics = [];
+ipcMain.on('owl3d:mics', (_event, list) => {
+  if (!Array.isArray(list)) return;
+  mics = list.filter(label => typeof label === 'string' && label).slice(0, 20);
+  rebuildTray();
 });
 
 ipcMain.on('owl3d:stop-speaking', () => {

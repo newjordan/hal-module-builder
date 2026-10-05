@@ -31,6 +31,7 @@ import { Arm, Cable, headForTool, isDataTool, partInstance } from './rig';
 import { DESK, HATCH, type Desk, type Hatch } from './station';
 import { clamp, clock, damp, rand, scene } from './stage';
 import { floorPulse } from './world';
+import { toolWord } from './words';
 
 export type PortalEvent = AgentEventInput & { replay?: boolean };
 
@@ -438,7 +439,7 @@ export class Bot {
       case 'tool':
         if (event.state === 'processing') {
           this.toolTint.set(toolColor(tool));
-          this.label.show(event.title, toolColor(tool), 4);
+          this.label.show(toolWord(tool), toolColor(tool), 4);
           if (isDataTool(tool)) {
             // Reads and searches go down the cable to the inner computer.
             this.setMode('compute');
@@ -456,14 +457,14 @@ export class Bot {
         }
         break;
       case 'error':
-        this.flinch(event.title);
+        this.flinch();
         break;
       case 'thought':
         if (this.mode !== 'work' || !this.queue.length) this.setMode('compute');
         break;
       case 'message':
         if (event.stage === 'intake') {
-          this.label.show('New prompt', STATE_COLORS.thinking, 2.5);
+          this.label.show('NEW TASK', STATE_COLORS.thinking, 2.5);
           floorPulse(
             this.position.x,
             this.position.z,
@@ -479,7 +480,7 @@ export class Bot {
         this.startDelivery(event.task || this.lastWork);
         break;
       case 'approval':
-        this.label.show(event.title, STATE_COLORS.waiting, 6);
+        this.label.show('APPROVE?', STATE_COLORS.waiting, 6);
         this.setMode('attention');
         break;
       default:
@@ -501,7 +502,7 @@ export class Bot {
     }
   }
 
-  private flinch(title: string): void {
+  private flinch(): void {
     const slot = this.plot.reserve();
     const block = new Block(
       this.plot.position(slot),
@@ -512,7 +513,7 @@ export class Bot {
     this.plot.release(slot); // broken blocks never hold a place in the stack
     this.arms?.R.reach(block.position, clock.now + 0.8, headForTool(this.tool));
     particles.burst(block.position.clone(), [0xff3030, 0xffb030], 24, 4);
-    this.label.show(title || 'Error', STATE_COLORS.error, 3.5);
+    this.label.show('ERROR', STATE_COLORS.error, 3.5);
     this.colorTarget.set(STATE_COLORS.error);
     this.colorHoldUntil = clock.now + 1.5;
     if (this.mode !== 'flinch')
@@ -533,7 +534,7 @@ export class Bot {
       startedAt: clock.now,
     };
     if (this.arms) this.arms.L.carried = item.object;
-    this.label.show('Delivering', STATE_COLORS.completed, 2.5);
+    this.label.show('DELIVER', STATE_COLORS.completed, 2.5);
     this.mode = 'deliver';
     this.modeAt = clock.now;
     this.activity = null;
@@ -544,11 +545,7 @@ export class Bot {
     if (!delivery) return;
     if (this.arms) this.arms.L.carried = null;
     delivery.item.object.scale.setScalar(1);
-    const spot = this.station.desk.deliver(
-      delivery.item,
-      delivery.title,
-      this.callsign
-    );
+    const spot = this.station.desk.deliver(delivery.item);
     particles.burst(
       spot.clone().setY(spot.y + 0.2),
       [0x62d995, 0x53d8df, 0xffffff],
@@ -560,7 +557,7 @@ export class Bot {
   }
 
   private celebrate(): void {
-    this.label.show('Done', STATE_COLORS.completed, 3);
+    this.label.show('DONE', STATE_COLORS.completed, 3);
     this.mode = 'celebrate';
     this.modeAt = clock.now;
     this.colorHoldUntil = clock.now + 6;

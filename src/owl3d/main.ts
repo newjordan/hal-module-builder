@@ -58,6 +58,8 @@ interface Owl3dHost {
   spoken?(id: string): void;
   /** Drop HAL's queued lines. */
   stopSpeaking?(): void;
+  /** The Mac's microphones, for the menu bar's Microphone menu. */
+  setMics?(mics: string[], selected: string): void;
 }
 declare global {
   interface Window {
@@ -135,30 +137,23 @@ const pushToTalk = {
 const dock = new VoiceDock({
   onRecordDown: () => pushToTalk.down(),
   onRecordUp: () => pushToTalk.up(),
-  onHandsFree: () =>
-    updateSettings({ voice: true, handsFree: !settings.handsFree }),
   onStop: () => {
     voice.interrupt();
     host?.stopSpeaking?.();
   },
-  onInput: label => updateSettings({ micLabel: label }),
 });
 
-/** Fill the dock's microphone list (labels need mic permission, granted once). */
+/** List the microphones in the menu bar menu (labels need mic permission, granted once). */
 async function refreshInputs(): Promise<void> {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const inputs = devices.filter(
       device => device.kind === 'audioinput' && device.label
     );
-    const fallback = inputs.find(device => device.deviceId === 'default');
-    const options = inputs
+    const labels = inputs
       .filter(device => device.deviceId !== 'default')
-      .map(device => ({
-        label: device.label,
-        isDefault: Boolean(fallback && fallback.label.endsWith(device.label)),
-      }));
-    dock.inputs(options, settings.micLabel);
+      .map(device => device.label);
+    host?.setMics?.(labels, settings.micLabel);
   } catch {
     /* no devices to list yet */
   }
@@ -167,7 +162,7 @@ navigator.mediaDevices?.addEventListener(
   'devicechange',
   () => void refreshInputs()
 );
-dock.render(voice.state, voice.detail, false);
+dock.render(voice.state, false);
 
 // In stereo the pointer hides after a moment; any movement brings it back.
 let pointerTimer = 0;
@@ -208,9 +203,8 @@ function applySettings(next: Partial<PortalSettings>): void {
   settings = { ...settings, ...next };
   document.body.dataset.mode = settings.mode;
   hud.mesh.visible = settings.hud;
-  hud.touch();
   dock.layout(settings.mode, settings.squeeze);
-  dock.render(voice.state, voice.detail, settings.handsFree, voice.warning);
+  dock.render(voice.state, Boolean(voice.warning));
   voice.setInput(settings.micLabel);
   void refreshInputs();
   if (settings.voice) void voice.enable(settings.handsFree);
@@ -243,8 +237,7 @@ window.addEventListener('storage', event => {
   if (event.key !== DESIGN_STORAGE_KEY && event.key !== null) return;
   design = planEye(readStoredDesign(window.localStorage) ?? DEFAULT_HAL_LAYERS);
   for (const bot of allBots()) bot.setDesign(design);
-  hud.setNotice('Eye design updated from HAL Studio');
-  window.setTimeout(() => hud.setNotice(''), 4000);
+  console.info('[owl3d] eye design updated from HAL Studio');
 });
 
 /* ------------------------------ agents ------------------------------ */
@@ -308,7 +301,6 @@ function handleEvent(event: PortalEvent): void {
   if (!bot) return;
   if (event.state === 'offline') {
     retire(bot);
-    hud.touch();
     return;
   }
   bot.apply(event);
@@ -320,8 +312,8 @@ connectAgentEvents({
   url: bridgeUrl(),
   onEvent: handleEvent,
   onConnection: state => {
+    if (state !== connection) console.info(`[owl3d] bridge ${state}`);
     connection = state;
-    hud.touch();
   },
 });
 
@@ -346,14 +338,7 @@ modelLibrary.addEventListener('change', () => {
   station.desk = new Desk();
   station.hatch = new Hatch();
   for (const bot of allBots()) bot.attachModels();
-  const count = modelLibrary.models.length;
-  hud.setNotice(
-    modelLibrary.errors.length
-      ? `Models: ${modelLibrary.errors[0]}`
-      : count
-        ? `${count} Blender model${count === 1 ? '' : 's'} loaded`
-        : ''
-  );
+  console.info(`[owl3d] ${modelLibrary.models.length} Blender models loaded`);
 });
 void modelLibrary.load().then(() => modelLibrary.watch());
 
@@ -367,18 +352,6 @@ if (host) {
 
 /* ------------------------------- voice ------------------------------- */
 
-const VOICE_LABELS: Record<VoiceState, [string, number]> = {
-  off: ['VOICE OFF', 0x56616b],
-  loading: ['VOICE LOADING', 0xf2b84b],
-  ready: ['PUSH TO TALK · HOLD . OR ●', 0x62d995],
-  recording: ['● RECORDING', 0xff3b30],
-  listening: ['MIC LISTENING (HANDS-FREE)', 0x62d995],
-  hearing: ['MIC HEARING YOU', 0x53d8df],
-  transcribing: ['MIC TRANSCRIBING', 0x53d8df],
-  speaking: ['HAL SPEAKING', 0xff625f],
-  error: ['MIC ERROR', 0xff625f],
-};
-
 /** The bot in the conversation: whoever last spoke, else the first. */
 let voiceAgent = '';
 function voiceBot(): Bot | undefined {
@@ -387,33 +360,25 @@ function voiceBot(): Bot | undefined {
 
 let lastVoiceLog = '';
 voice.onChange = () => {
-  const [label, color] = VOICE_LABELS[voice.state];
   const status = `${voice.state}${voice.detail ? ` · ${voice.detail}` : ''}`;
   // Progress ticks are noisy; log state changes and the final detail.
   if (voice.state !== 'loading' || !/%$/.test(voice.detail)) {
     if (status !== lastVoiceLog) console.info(`[owl3d] voice ${status}`);
     lastVoiceLog = status;
   }
-  const showDetail = voice.state === 'loading' || voice.state === 'error';
-  hud.setVoice(
-    showDetail && voice.detail ? `${label} · ${voice.detail}` : label,
-    color
-  );
-  dock.render(voice.state, voice.detail, settings.handsFree, voice.warning);
-  if (voice.warning) hud.setVoice('MIC SILENT · PICK ANOTHER MIC', 0xff625f);
+  if (voice.warning) console.warn(`[owl3d] ${voice.warning}`);
+  dock.render(voice.state, Boolean(voice.warning));
 };
 
 voice.onHeard = text => {
-  caption.show('YOU', text, 0x53d8df);
-  hud.say('YOU', text, 0x53d8df);
+  caption.show(text, 0x53d8df);
   if (host?.heard) host.heard(text);
   else console.info('[owl3d] heard:', text);
 };
 
 host?.onSpeak?.(line => {
   if (line.agentId && bots.has(line.agentId)) voiceAgent = line.agentId;
-  caption.show(voiceBot()?.callsign ?? 'HAL', line.text, 0xff625f);
-  hud.say(voiceBot()?.callsign ?? 'HAL', line.text, 0xff625f);
+  caption.show(line.text, 0xff625f);
   const audio = line.audio.buffer.slice(
     line.audio.byteOffset,
     line.audio.byteOffset + line.audio.byteLength
@@ -592,7 +557,7 @@ function frame(time: number): void {
     }
   }
 
-  if (settings.hud) hud.draw([...bots.values()], connection);
+  if (settings.hud) hud.draw([...bots.values()], dt, caption.showing);
 
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -650,7 +615,7 @@ const voiceHooks = {
   },
   /** Speak through the browser voice (no shell). */
   say(text: string): Promise<void> {
-    caption.show('HAL', text, 0xff625f);
+    caption.show(text, 0xff625f);
     return voice.say(text);
   },
   get state(): VoiceState {

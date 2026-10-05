@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { ROOM, STATE_COLORS } from './config';
-import { MONO_FONT, UI_FONT, glowSprite, textSurface } from './fx';
+import { UI_FONT, glowSprite, textSurface } from './fx';
 import { ModelInstance } from './models';
 import { partInstance } from './rig';
-import { clamp, clock, cssColor, damp, scene } from './stage';
+import { clamp, clock, damp, scene } from './stage';
 import { gridUniforms } from './world';
 
 /**
@@ -37,12 +37,7 @@ export class Desk {
     { length: SLOTS_X.length * SLOTS_Z.length },
     () => null
   );
-  private readonly log: Array<{
-    title: string;
-    who: string;
-    at: number;
-    color: number;
-  }> = [];
+  private delivered = 0;
   private next = 0;
   private dirty = true;
 
@@ -116,7 +111,7 @@ export class Desk {
   }
 
   /** Set a carried cartridge down in the next slot and log it on the screen. */
-  deliver(item: DeskItem, title: string, who: string): THREE.Vector3 {
+  deliver(item: DeskItem): THREE.Vector3 {
     const index = this.next;
     const previous = this.items[index];
     if (previous) previous.sinking = clock.now;
@@ -126,13 +121,7 @@ export class Desk {
     item.object.position.copy(spot);
     item.object.quaternion.identity();
     item.born = clock.now;
-    this.log.unshift({
-      title,
-      who,
-      at: Date.now(),
-      color: item.color.getHex(),
-    });
-    this.log.length = Math.min(this.log.length, 5);
+    this.delivered++;
     this.dirty = true;
     return spot;
   }
@@ -170,46 +159,26 @@ export class Desk {
     }
   }
 
+  /** One huge glyph: a check and how many pieces of work were delivered. */
   private drawScreen(): void {
     if (!this.dirty) return;
     this.dirty = false;
     const { canvas, g, texture } = this.surface;
     g.clearRect(0, 0, canvas.width, canvas.height);
-    g.fillStyle = 'rgba(83,216,223,0.06)';
+    g.fillStyle = 'rgba(83,216,223,0.07)';
     g.fillRect(0, 0, canvas.width, canvas.height);
-    g.strokeStyle = 'rgba(83,216,223,0.55)';
-    g.lineWidth = 4;
-    g.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
-    // Scanlines sell the hologram.
-    g.fillStyle = 'rgba(83,216,223,0.05)';
-    for (let y = 0; y < canvas.height; y += 6)
-      g.fillRect(0, y, canvas.width, 2);
-    g.fillStyle = '#53d8df';
-    g.font = `700 52px ${UI_FONT}`;
-    g.fillText('DELIVERED', 40, 84);
-    g.font = `500 38px ${MONO_FONT}`;
-    let y = 160;
-    if (!this.log.length) {
-      g.fillStyle = 'rgba(201,209,216,0.6)';
-      g.fillText('Nothing yet. Finished work lands here.', 40, y);
-    }
-    for (const entry of this.log) {
-      g.fillStyle = cssColor(entry.color);
-      g.fillRect(40, y - 30, 10, 38);
-      g.fillStyle = 'rgba(138,151,163,0.95)';
-      g.fillText(
-        new Date(entry.at).toLocaleTimeString([], {
-          hourCycle: 'h23',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        70,
-        y
-      );
-      g.fillStyle = '#eef1f3';
-      g.fillText(`${entry.who} · ${entry.title}`, 200, y, canvas.width - 240);
-      y += 78;
-    }
+    g.strokeStyle = 'rgba(83,216,223,0.7)';
+    g.lineWidth = 14;
+    g.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `800 380px ${UI_FONT}`;
+    g.fillStyle = this.delivered ? '#62d995' : 'rgba(83,216,223,0.45)';
+    g.fillText(
+      this.delivered ? `✓ ${this.delivered}` : '✓',
+      canvas.width / 2,
+      canvas.height / 2 + 20
+    );
     texture.needsUpdate = true;
   }
 }

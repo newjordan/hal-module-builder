@@ -104,6 +104,15 @@ Each live agent gets its own bot (up to four) with a colored identity band and
 its own build plot. HAL embodies the first agent and stays home when the last
 one leaves.
 
+## Text on the Shift
+
+The Shift resolves big shapes, not small type, so the portal never shows
+small text: the HUD is one state word and one action word, bots float one
+word (RUN, EDIT, SEARCH, DONE…, see `src/owl3d/words.ts`), subtitles show a
+few huge words at a time, the desk screen is a big ✓ count, and the voice
+dock is a big ● record button, one word and a big ■ stop. Settings such as
+the microphone and hands-free listening live in the menu bar menu.
+
 ## Talking to HAL
 
 Talking is **push-to-talk**: hold the red ● in the dock at the bottom left
