@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { DEFAULT_HAL_LAYERS } from '../config/defaultHalDesign';
-import { Bot, HOME_ID, HOME_IDENTITY, type PortalEvent } from './bot';
+import {
+  Bot,
+  HOME_ID,
+  HOME_IDENTITY,
+  type PortalEvent,
+  type Station,
+} from './bot';
 import {
   D,
   DEFAULT_SETTINGS,
@@ -14,6 +20,7 @@ import {
   type PortalSettings,
 } from './config';
 import { runDemo } from './demo';
+import { setEyeRenderer } from './eye';
 import { bridgeUrl, connectAgentEvents, type ConnectionLabel } from './events';
 import { particles } from './fx';
 import { Hud } from './hud';
@@ -25,6 +32,7 @@ import {
 } from './layerPlan';
 import { ModelInstance, modelLibrary } from './models';
 import { updateBlocks } from './plot';
+import { Desk, Hatch } from './station';
 import { clock, scene } from './stage';
 import { buildRoom, createDust, gridUniforms } from './world';
 
@@ -55,6 +63,7 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
+setEyeRenderer(renderer);
 
 const environment = new THREE.PMREMGenerator(renderer);
 scene.environment = environment.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -71,6 +80,8 @@ camera.position.set(0, 0, D);
 const stereo = new THREE.StereoCamera();
 
 buildRoom();
+// Built after models load so they use the Blender kit; see rebuildStation().
+const station: Station = { desk: new Desk(), hatch: new Hatch() };
 const updateDust = createDust();
 const hud = new Hud();
 
@@ -135,7 +146,7 @@ window.addEventListener('storage', event => {
 
 const bots = new Map<string, Bot>();
 const departing = new Set<Bot>();
-bots.set(HOME_ID, new Bot(0, design));
+bots.set(HOME_ID, new Bot(0, design, station));
 
 function allBots(): Bot[] {
   return [...bots.values(), ...departing];
@@ -170,7 +181,7 @@ function botFor(event: PortalEvent): Bot | null {
   }
   const slot = freeSlot();
   if (slot < 0) return null;
-  const bot = new Bot(slot, design, identity);
+  const bot = new Bot(slot, design, station, identity);
   bots.set(event.agentId, bot);
   return bot;
 }
@@ -225,6 +236,10 @@ modelLibrary.addEventListener('change', () => {
     scene.add(instance.root);
     return instance;
   });
+  station.desk.dispose();
+  station.hatch.dispose();
+  station.desk = new Desk();
+  station.hatch = new Hatch();
   for (const bot of allBots()) bot.attachModels();
   const count = modelLibrary.models.length;
   hud.setNotice(
@@ -329,6 +344,18 @@ function frame(time: number): void {
     }
   }
   updateBlocks(now, dt);
+  const computing = allBots().filter(bot => bot.wantsHatch);
+  const glowBot = computing[0] ?? allBots()[0];
+  station.hatch.update(
+    dt,
+    computing.length,
+    Math.min(
+      1,
+      computing.reduce((sum, bot) => sum + bot.computeLoad, 0)
+    ),
+    glowBot?.color ?? homeColor
+  );
+  station.desk.update(dt, glowBot?.color ?? homeColor, glowBot?.energy ?? 0.2);
   particles.update(dt);
   updateDust(now, dt);
   worldModels.forEach(model => {

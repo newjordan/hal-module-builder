@@ -175,21 +175,28 @@ returns to the demo state instead of leaving the console offline.
 
 Do not wrap replay arrays in a snapshot envelope.
 
-## Bundled Codex sidecar
+## Bundled agent sidecar
 
 `npm run dev:live` starts `scripts/agent-bridge.mjs` beside Vite and injects the
-local WebSocket URL. `npm run bridge` starts only the producer. It:
+local WebSocket URL. `npm run bridge` starts only the producer. It reads two
+sources, Codex and Claude Code (`HAL_SOURCES`), and:
 
 - binds `127.0.0.1:8765/hal-agent-events` with a 64 KiB frame cap and exact
   origin allowlist;
 - polls recent `~/.codex/sessions/**/*.jsonl` files using byte offsets, partial
   line buffering, stable IDs, and bounded replay;
+- polls recent Claude Code transcripts in `~/.claude/projects/<project>/*.jsonl`
+  (`scripts/claude-code-source.mjs`), starting long transcripts near their end;
+  prompts, thinking, tool calls and results, replies and finished turns map to
+  `message`, `thought`, `tool`, `error` and `completion` events, and agents are
+  named `claude:<session id>` with a `CLD-` callsign;
 - includes only sessions whose `cwd` equals `HAL_WORKSPACE` or the launch
-  directory;
+  directory, or every workspace when `HAL_WORKSPACE='*'`;
 - maps session/task/reasoning activity/tool lifecycle/visible agent updates/
   token counters into the canonical schema;
 - never forwards prompts, instructions, reasoning content or ciphertext, tool
-  arguments, or raw tool output;
+  arguments, or raw tool output; from Claude Code tool calls it keeps only the
+  tool name and the call's own one-line `description`, sanitized;
 - redacts secret-like values and truncates visible agent commentary;
 - rejects commands with a correlated `commandStatus: "rejected"` event because
   it is intentionally read-only.
@@ -198,10 +205,13 @@ Configuration:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `HAL_WORKSPACE` | current directory | Exact session `cwd` filter. |
+| `HAL_WORKSPACE` | current directory | Exact session `cwd` filter; `*` follows every workspace. |
+| `HAL_SOURCES` | `codex,claude` | Which session sources to read. |
+| `HAL_CLAUDE_LOOKBACK_MINUTES` | `120` | Claude Code transcripts older than this are ignored. |
+| `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude Code data root. |
 | `CODEX_HOME` | `~/.codex` | Codex data root. |
 | `HAL_BRIDGE_PORT` | `8765` | Local WebSocket port. |
-| `HAL_ALLOWED_ORIGINS` | local Vite/preview origins | Comma-separated exact origins. |
+| `HAL_ALLOWED_ORIGINS` | local Vite/preview origins, `hal://app` | Comma-separated exact origins. |
 | `HAL_LOOKBACK_HOURS` | `24` | Recent session discovery window. |
 | `HAL_POLL_MS` | `750` | Filesystem poll interval, minimum 250 ms. |
 

@@ -9,6 +9,7 @@ import {
   clipFor,
   parseManifest,
   type ModelEntry,
+  type PartName,
   type Socket,
 } from './manifest';
 
@@ -126,6 +127,18 @@ export class ModelInstance {
     }
   }
 
+  /**
+   * An empty named in Blender (socket_arm_L …). Blender suffixes duplicate
+   * names (.001), so the suffix is ignored.
+   */
+  socket(name: string): THREE.Object3D | null {
+    let found: THREE.Object3D | null = null;
+    this.root.traverse(child => {
+      if (!found && child.name.replace(/\.\d+$/, '') === name) found = child;
+    });
+    return found;
+  }
+
   /** Materials for fading/flashing build blocks. */
   materials(): THREE.Material[] {
     const all: THREE.Material[] = [];
@@ -211,6 +224,10 @@ export class ModelLibrary extends EventTarget {
 
   forSocket(socket: Socket): LoadedModel[] {
     return this.models.filter(model => model.entry.attach === socket);
+  }
+
+  part(name: PartName): LoadedModel | null {
+    return this.models.find(model => model.entry.part === name) ?? null;
   }
 
   buildFor(tool: string): LoadedModel | null {

@@ -90,6 +90,18 @@ test('maps a full Claude Code turn onto the HAL lifecycle', () => {
   assert.equal(done[1].agent.workspace, 'hal-module-builder');
 });
 
+test('infers a long context window when usage exceeds the default', () => {
+  const context = createClaudeContext({ sessionId: 'long' });
+  const [event] = normalizeClaudeRecord(
+    assistant([{ type: 'thinking', thinking: '' }], {
+      usage: { input_tokens: 10, cache_read_input_tokens: 450_000, output_tokens: 90 },
+    }),
+    context,
+    0
+  );
+  assert.deepEqual(event.metrics, { tokensUsed: 450_100, contextWindow: 1_000_000 });
+});
+
 test('never forwards prompts, reasoning, tool arguments, or tool output', () => {
   const context = createClaudeContext({ sessionId: 'privacy-session' });
   const records = [

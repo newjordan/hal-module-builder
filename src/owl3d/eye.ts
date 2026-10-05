@@ -3,14 +3,37 @@ import type { EyePart } from './layerPlan';
 import { canvasTexture } from './fx';
 
 /**
- * The HAL Studio layer stack as a physical lens assembly. Layers sit inside a
- * recess in the bot's shell, rear layers deeper, so on a stereo display you
- * look *into* the eye.
+ * The HAL Studio layer stack as a sphere lens.
+ *
+ * Every studio layer is drawn flat into its own texture (an orthographic
+ * render of the 2D design, so equalizers and reactive layers stay live) and
+ * that texture is UV-mapped onto a spherical shell. Shells nest inside the
+ * lens opening, rear layers deepest, under a clear glass dome, so the eye
+ * reads as a real lens with depth from every angle and in stereo.
  */
 
-export const LENS_RADIUS = 0.64;
-const Z_BACK = 0.3;
-const Z_SPAN = 0.38;
+/** Radius of the lens opening in the shell (blender/build_owl3d_kit.py). */
+export const LENS_RADIUS = 0.62;
+const SHELL_BACK = 0.74;
+const SHELL_FRONT = 0.9;
+const DOME = 0.925;
+const TEXTURE_SIZE = 512;
+
+let eyeRenderer: THREE.WebGLRenderer | null = null;
+
+/** The renderer used to draw layer textures; set once by main.ts. */
+export function setEyeRenderer(renderer: THREE.WebGLRenderer): void {
+  eyeRenderer = renderer;
+}
+
+const layerCamera = new THREE.OrthographicCamera(
+  -LENS_RADIUS,
+  LENS_RADIUS,
+  LENS_RADIUS,
+  -LENS_RADIUS,
+  -1,
+  1
+);
 
 function gradientTexture(part: EyePart): THREE.CanvasTexture {
   const size = 512;
@@ -43,15 +66,50 @@ function gradientTexture(part: EyePart): THREE.CanvasTexture {
   return canvasTexture(canvas);
 }
 
+/**
+ * A spherical cap of radius `radius` whose rim has planar radius
+ * LENS_RADIUS, facing +z, with UVs projected straight through the lens so a
+ * flat layer texture lands where the studio drew it.
+ */
+function lensCap(radius: number): THREE.BufferGeometry {
+  const opening = Math.asin(Math.min(1, LENS_RADIUS / radius));
+  const geometry = new THREE.SphereGeometry(
+    radius,
+    64,
+    24,
+    0,
+    Math.PI * 2,
+    0,
+    opening
+  );
+  geometry.rotateX(Math.PI / 2);
+  const position = geometry.getAttribute('position');
+  const uv = geometry.getAttribute('uv');
+  for (let i = 0; i < position.count; i++) {
+    uv.setXY(
+      i,
+      0.5 + position.getX(i) / (2 * LENS_RADIUS),
+      0.5 + position.getY(i) / (2 * LENS_RADIUS)
+    );
+  }
+  uv.needsUpdate = true;
+  return geometry;
+}
+
 interface BarsRuntime {
   mesh: THREE.InstancedMesh;
   base: THREE.Color[];
   part: EyePart;
 }
 
-interface PartRuntime {
-  object: THREE.Object3D;
+interface Layer {
   part: EyePart;
+  flat: THREE.Object3D;
+  scene: THREE.Scene;
+  target: THREE.WebGLRenderTarget;
+  shell: THREE.Mesh;
+  live: boolean;
+  drawn: boolean;
 }
 
 const matrix = new THREE.Matrix4();
@@ -60,30 +118,79 @@ const position = new THREE.Vector3();
 const scale = new THREE.Vector3();
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const mixed = new THREE.Color();
+const savedClear = new THREE.Color();
 
 export class LayerEye {
   readonly group = new THREE.Group();
-  private readonly parts: PartRuntime[] = [];
+  private readonly layers: Layer[] = [];
   private readonly bars: BarsRuntime[] = [];
   private readonly disposables: Array<{ dispose(): void }> = [];
 
   constructor(plan: readonly EyePart[]) {
+    // The dark inside of the eye, so shells read against black.
+    const socket = new THREE.Mesh(
+      new THREE.SphereGeometry(SHELL_BACK - 0.02, 48, 24),
+      new THREE.MeshStandardMaterial({ color: 0x020203, roughness: 0.9 })
+    );
+    this.group.add(socket);
+    this.disposables.push(socket.geometry, socket.material);
+
     plan.forEach((part, index) => {
-      const object = this.build(part);
-      if (!object) return;
-      object.position.set(
+      const flat = this.buildFlat(part);
+      if (!flat) return;
+      flat.position.set(
         part.offsetX * LENS_RADIUS,
         part.offsetY * LENS_RADIUS,
-        Z_BACK + part.depth * Z_SPAN
+        0
       );
-      object.renderOrder = 20 + index;
-      object.traverse(child => (child.renderOrder = 20 + index));
-      this.group.add(object);
-      this.parts.push({ object, part });
+      const scene = new THREE.Scene();
+      scene.add(flat);
+      const target = new THREE.WebGLRenderTarget(TEXTURE_SIZE, TEXTURE_SIZE, {
+        samples: 4,
+      });
+      const radius = SHELL_BACK + part.depth * (SHELL_FRONT - SHELL_BACK);
+      const geometry = lensCap(radius);
+      const material = new THREE.MeshBasicMaterial({
+        map: target.texture,
+        transparent: true,
+        opacity: 1,
+        blending: part.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+        depthWrite: false,
+      });
+      const shell = new THREE.Mesh(geometry, material);
+      shell.renderOrder = 20 + index;
+      this.group.add(shell);
+      this.disposables.push(target, geometry, material);
+      this.layers.push({
+        part,
+        flat,
+        scene,
+        target,
+        shell,
+        live: part.kind === 'bars' || part.reactive,
+        drawn: false,
+      });
     });
+
+    // Clear glass over everything; picks up the room's reflections.
+    const dome = new THREE.Mesh(
+      lensCap(DOME),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 0.04,
+        metalness: 0,
+        clearcoat: 1,
+        transparent: true,
+        opacity: 0.14,
+        depthWrite: false,
+      })
+    );
+    dome.renderOrder = 20 + plan.length;
+    this.group.add(dome);
+    this.disposables.push(dome.geometry, dome.material);
   }
 
-  private material(
+  private flatMaterial(
     part: EyePart,
     map: THREE.Texture | null
   ): THREE.MeshBasicMaterial {
@@ -94,36 +201,40 @@ export class LayerEye {
       blending: part.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
+      toneMapped: false,
     });
     this.disposables.push(material);
     if (map) this.disposables.push(map);
     return material;
   }
 
-  private build(part: EyePart): THREE.Object3D | null {
+  private buildFlat(part: EyePart): THREE.Object3D | null {
     const radius = Math.max(0.005, part.radius * LENS_RADIUS);
 
     if (part.kind === 'bars') return this.buildBars(part);
 
     if (part.kind === 'image') {
-      const texture = new THREE.TextureLoader().load(part.src);
+      const texture = new THREE.TextureLoader().load(part.src, () => {
+        const layer = this.layers.find(item => item.part === part);
+        if (layer) layer.drawn = false;
+      });
       texture.colorSpace = THREE.SRGBColorSpace;
       const geometry = new THREE.PlaneGeometry(radius * 2, radius * 2);
       this.disposables.push(geometry);
-      return new THREE.Mesh(geometry, this.material(part, texture));
+      return new THREE.Mesh(geometry, this.flatMaterial(part, texture));
     }
 
     if (part.kind === 'ring') {
       const width = Math.max(0.006, part.inner * LENS_RADIUS);
       if (part.dash) {
-        // Dashed strokes become ticks, which read far better in depth.
+        // Dashed strokes become ticks.
         const arc = (2 * Math.PI * radius) / part.dash.count;
         const geometry = new THREE.PlaneGeometry(
           Math.max(0.004, arc * part.dash.duty),
           width
         );
         this.disposables.push(geometry);
-        const material = this.material(part, null);
+        const material = this.flatMaterial(part, null);
         material.color.set(part.colors[0] ?? '#ffffff');
         const ticks = new THREE.InstancedMesh(
           geometry,
@@ -154,7 +265,7 @@ export class LayerEye {
       this.disposables.push(geometry);
       return new THREE.Mesh(
         geometry,
-        this.material(part, gradientTexture(part))
+        this.flatMaterial(part, gradientTexture(part))
       );
     }
 
@@ -163,7 +274,10 @@ export class LayerEye {
         ? new THREE.CircleGeometry(radius, part.sides, Math.PI / 2)
         : new THREE.CircleGeometry(radius, 96);
     this.disposables.push(geometry);
-    return new THREE.Mesh(geometry, this.material(part, gradientTexture(part)));
+    return new THREE.Mesh(
+      geometry,
+      this.flatMaterial(part, gradientTexture(part))
+    );
   }
 
   private buildBars(part: EyePart): THREE.Object3D {
@@ -181,8 +295,11 @@ export class LayerEye {
           )
         : new THREE.PlaneGeometry(width, 1).translate(0, 0.5, 0);
     this.disposables.push(geometry);
-    const material = this.material(part, null);
-    const mesh = new THREE.InstancedMesh(geometry, material, part.barCount);
+    const mesh = new THREE.InstancedMesh(
+      geometry,
+      this.flatMaterial(part, null),
+      part.barCount
+    );
     const first = new THREE.Color(part.colors[0] ?? '#ff2a00');
     const last = new THREE.Color(part.colors[1] ?? part.colors[0] ?? '#ffa040');
     const base: THREE.Color[] = [];
@@ -199,7 +316,7 @@ export class LayerEye {
 
   /**
    * `energy` 0..1 stands in for the studio's audio input; `tint` blends the
-   * reactive layers toward the agent's state color.
+   * equalizers toward the agent's state color.
    */
   update(
     dt: number,
@@ -209,10 +326,12 @@ export class LayerEye {
     tint: number,
     speech: boolean
   ): void {
-    for (const { object, part } of this.parts) {
-      if (part.spin) object.rotation.z += part.spin * dt * (1 + energy);
+    for (const layer of this.layers) {
+      const { part, flat, shell } = layer;
+      // Spinning layers turn the whole shell, so the texture stays put.
+      if (part.spin) shell.rotation.z += part.spin * dt * (1 + energy);
       if (part.reactive && part.kind !== 'bars') {
-        object.scale.setScalar(
+        flat.scale.setScalar(
           1 + energy * 0.07 * (0.6 + 0.4 * Math.sin(now * 7 + part.depth * 5))
         );
       }
@@ -246,6 +365,26 @@ export class LayerEye {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
+    this.renderLayers();
+  }
+
+  /** Redraw live layers (and any not drawn yet) into their textures. */
+  private renderLayers(): void {
+    const renderer = eyeRenderer;
+    if (!renderer) return;
+    const previousTarget = renderer.getRenderTarget();
+    const previousAlpha = renderer.getClearAlpha();
+    renderer.getClearColor(savedClear);
+    renderer.setClearColor(0x000000, 0);
+    for (const layer of this.layers) {
+      if (layer.drawn && !layer.live) continue;
+      renderer.setRenderTarget(layer.target);
+      renderer.clear();
+      renderer.render(layer.scene, layerCamera);
+      layer.drawn = true;
+    }
+    renderer.setRenderTarget(previousTarget);
+    renderer.setClearColor(savedClear, previousAlpha);
   }
 
   dispose(): void {

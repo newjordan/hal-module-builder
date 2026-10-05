@@ -17,7 +17,32 @@ export const SOCKETS = [
   'eye.body',
   'world',
   'build',
+  'part',
 ] as const;
+
+/**
+ * Named rig parts the portal assembles itself ('attach': 'part'). Missing
+ * parts fall back to simple built-in shapes.
+ */
+export const PARTS = [
+  'shell',
+  'arm.shoulder',
+  'arm.upper',
+  'arm.fore',
+  'tool.gripper',
+  'tool.driver',
+  'tool.pen',
+  'tool.probe',
+  'tool.dish',
+  'tool.splitter',
+  'desk',
+  'floor.panel',
+  'core',
+  'cable.plug',
+  'deliverable',
+] as const;
+
+export type PartName = (typeof PARTS)[number];
 
 export type Socket = (typeof SOCKETS)[number];
 export type Tint = 'none' | 'state' | 'tool';
@@ -41,6 +66,8 @@ export interface ModelEntry {
   orbitSpeed: number;
   /** For 'build' models: tool names (regex source) this block replaces. */
   tools: string[];
+  /** For 'part' models: which rig part this file provides. */
+  part: PartName | null;
   /** Hide the default metal shell (for 'eye.body' replacements). */
   hideShell: boolean;
   enabled: boolean;
@@ -52,6 +79,7 @@ export interface ParsedManifest {
 }
 
 const SOCKET_SET = new Set<string>(SOCKETS);
+const PART_SET = new Set<string>(PARTS);
 const TINTS = new Set<string>(['none', 'state', 'tool']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -112,6 +140,13 @@ export function parseManifest(input: unknown): ParsedManifest {
     if (!SOCKET_SET.has(attach)) {
       errors.push(
         `${where} (${id}): unknown "attach" ${JSON.stringify(attach)}; use one of ${SOCKETS.join(', ')}`
+      );
+      return;
+    }
+    const part = typeof raw.part === 'string' ? raw.part : null;
+    if (attach === 'part' && (!part || !PART_SET.has(part))) {
+      errors.push(
+        `${where} (${id}): part models need "part", one of ${PARTS.join(', ')}`
       );
       return;
     }
@@ -178,6 +213,7 @@ export function parseManifest(input: unknown): ParsedManifest {
       orbitRadius,
       orbitSpeed,
       tools,
+      part: attach === 'part' ? (part as PartName) : null,
       hideShell: raw.hideShell === true,
       enabled: raw.enabled !== false,
     });

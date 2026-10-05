@@ -1,12 +1,26 @@
 {
   "models": [
+    { "id": "shell", "file": "hal-shell.glb", "attach": "part", "part": "shell" },
+    { "id": "arm-shoulder", "file": "arm-shoulder.glb", "attach": "part", "part": "arm.shoulder" },
+    { "id": "arm-upper", "file": "arm-upper.glb", "attach": "part", "part": "arm.upper" },
+    { "id": "arm-fore", "file": "arm-fore.glb", "attach": "part", "part": "arm.fore" },
+    { "id": "tool-gripper", "file": "tool-gripper.glb", "attach": "part", "part": "tool.gripper", "tint": "tool" },
+    { "id": "tool-driver", "file": "tool-driver.glb", "attach": "part", "part": "tool.driver", "tint": "tool" },
+    { "id": "tool-pen", "file": "tool-pen.glb", "attach": "part", "part": "tool.pen", "tint": "tool" },
+    { "id": "tool-probe", "file": "tool-probe.glb", "attach": "part", "part": "tool.probe", "tint": "tool" },
+    { "id": "tool-dish", "file": "tool-dish.glb", "attach": "part", "part": "tool.dish", "tint": "tool" },
+    { "id": "tool-splitter", "file": "tool-splitter.glb", "attach": "part", "part": "tool.splitter", "tint": "tool" },
+    { "id": "desk", "file": "desk.glb", "attach": "part", "part": "desk" },
+    { "id": "floor-panel", "file": "floor-panel.glb", "attach": "part", "part": "floor.panel" },
+    { "id": "core", "file": "core.glb", "attach": "part", "part": "core", "clips": { "work": "Work", "*": "Idle" } },
+    { "id": "cable-plug", "file": "cable-plug.glb", "attach": "part", "part": "cable.plug" },
+    { "id": "deliverable", "file": "deliverable.glb", "attach": "part", "part": "deliverable", "tint": "tool" },
     {
       "id": "antenna",
       "file": "antenna.glb",
       "attach": "eye.top",
-      "position": [0.18, -0.04, 0],
-      "rotation": [0, 0, -12],
-      "tint": "state",
+      "position": [0.2, -0.05, -0.1],
+      "rotation": [0, 0, -14],
       "clips": { "work": "Work", "celebrate": "Celebrate", "*": "Idle" }
     },
     {
@@ -16,30 +30,16 @@
       "orbitRadius": 1.9,
       "orbitSpeed": 0.7,
       "spin": 1.2,
-      "tint": "state",
       "clips": { "*": "Blink" }
     },
-    {
-      "id": "server",
-      "file": "server.glb",
-      "attach": "build",
-      "tools": ["Bash", "BashOutput", "shell", "exec_command"],
-      "tint": "tool"
-    },
-    {
-      "id": "page",
-      "file": "page.glb",
-      "attach": "build",
-      "tools": ["Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"],
-      "tint": "tool"
-    },
+    { "id": "server", "file": "server.glb", "attach": "build", "tools": ["Bash", "BashOutput", "shell", "exec_command"], "tint": "tool" },
+    { "id": "page", "file": "page.glb", "attach": "build", "tools": ["Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"], "tint": "tool" },
     {
       "id": "pylon",
       "file": "pylon.glb",
       "attach": "world",
-      "position": [-6.2, -4.5, -21],
+      "position": [-6.6, -4.5, -22],
       "scale": 0.9,
-      "tint": "state",
       "clips": { "*": "Idle" }
     }
   ]

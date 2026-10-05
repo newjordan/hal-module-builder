@@ -6,10 +6,10 @@ import { clamp, clock, pick, scene } from './stage';
 
 /** Where each bot builds; slot index → plot center on the floor. */
 export const PLOTS = [
-  { cx: 3.6, cz: -11 },
-  { cx: -3.6, cz: -11 },
-  { cx: 3.6, cz: -17.5 },
-  { cx: -3.6, cz: -17.5 },
+  { cx: 4.4, cz: -11 },
+  { cx: -4.4, cz: -11 },
+  { cx: 4.4, cz: -17.5 },
+  { cx: -4.4, cz: -17.5 },
 ] as const;
 
 const CELL = 1.25;

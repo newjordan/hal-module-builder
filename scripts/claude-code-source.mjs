@@ -166,6 +166,9 @@ export function normalizeClaudeRecord(record, context, offset = 0) {
   }
   const tokens = usageTokens(message.usage);
   if (tokens) context.tokensUsed = tokens;
+  // Transcripts do not always name long-context models; usage past the
+  // assumed window proves the larger one.
+  if (tokens > context.contextWindow) context.contextWindow = 1_000_000;
   const metrics = tokens
     ? { tokensUsed: tokens, contextWindow: context.contextWindow }
     : undefined;

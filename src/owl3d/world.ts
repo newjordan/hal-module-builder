@@ -30,6 +30,8 @@ export const gridUniforms = {
   uBg: { value: new THREE.Color(BACKGROUND) },
   uLine: { value: new THREE.Color(0x2a5a80) },
   uFloorY: { value: ROOM.floor },
+  /** Floor hatch: center x, center z, half size, openness 0..1. */
+  uHatch: { value: new THREE.Vector4(0, 0, 1, 0) },
 };
 
 const vertexShader = /* glsl */ `
@@ -53,6 +55,7 @@ const fragmentShader = /* glsl */ `
   uniform vec3 uBg;
   uniform vec3 uLine;
   uniform float uFloorY;
+  uniform vec4 uHatch;
   varying vec3 vWorld;
 
   float grid(vec2 c, float cell, float width) {
@@ -62,6 +65,11 @@ const fragmentShader = /* glsl */ `
   }
 
   void main() {
+    // The floor hatch opens onto the inner computer below.
+    if (uMode == 0 && vWorld.y < 0.0 && uHatch.w > 0.001 &&
+        abs(vWorld.x - uHatch.x) < uHatch.z && abs(vWorld.z - uHatch.y) < uHatch.z) {
+      discard;
+    }
     vec2 c = uMode == 0 ? vWorld.xz : (uMode == 1 ? vWorld.xy : vWorld.zy);
     float lines = max(grid(c, 2.0, 1.5), grid(c, 0.5, 1.0) * 0.22);
 
@@ -105,6 +113,11 @@ const fragmentShader = /* glsl */ `
     col += uLine * lines * 0.6;
     col += glow * (0.12 + lines * 1.6);
     col += tile + pulse * (0.35 + lines * 1.2);
+    if (uMode == 0 && vWorld.y < 0.0) {
+      vec2 q = abs(vWorld.xz - uHatch.xy) - uHatch.z;
+      float rim = 1.0 - smoothstep(0.0, 0.07, abs(max(q.x, q.y)));
+      col += vec3(0.32, 0.85, 0.87) * rim * (0.2 + uHatch.w);
+    }
     col *= 1.0 - shadow * 0.85;
     col = mix(col, uBg, smoothstep(24.0, 50.0, length(vWorld - cameraPosition)));
     gl_FragColor = vec4(col, 1.0);

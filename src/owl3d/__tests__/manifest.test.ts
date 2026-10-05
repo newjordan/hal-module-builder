@@ -55,6 +55,28 @@ describe('parseManifest', () => {
   });
 });
 
+describe('rig parts', () => {
+  it('accepts known parts and rejects unknown ones', () => {
+    const { models, errors } = parseManifest({
+      models: [
+        { id: 'desk', file: 'desk.glb', attach: 'part', part: 'desk' },
+        { id: 'arm', file: 'arm.glb', attach: 'part', part: 'arm.elbow' },
+        { id: 'nopart', file: 'x.glb', attach: 'part' },
+      ],
+    });
+    expect(models.map(model => [model.id, model.part])).toEqual([
+      ['desk', 'desk'],
+    ]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toMatch(/arm\.elbow|part models need/);
+  });
+
+  it('leaves part null for socket models', () => {
+    const { models } = parseManifest({ models: [{ id: 'a', file: 'a.glb' }] });
+    expect(models[0]?.part).toBeNull();
+  });
+});
+
 describe('clipFor', () => {
   const entry = {
     clips: { processing: 'Work', celebrate: 'Spin', '*': 'Idle' },

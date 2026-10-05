@@ -264,6 +264,18 @@ function createPortal() {
   });
   portal.loadURL(`${baseUrl}owl3d.html`);
   portal.webContents.on('did-finish-load', sendSettings);
+  // Debug aid: OWL3D_SNAPSHOT=/path/to.png saves what the portal shows once
+  // it has settled (OWL3D_SNAPSHOT_DELAY ms, default 12000), then quits.
+  if (process.env.OWL3D_SNAPSHOT) {
+    portal.webContents.once('did-finish-load', () =>
+      setTimeout(async () => {
+        const image = await portal.webContents.capturePage();
+        fs.writeFileSync(process.env.OWL3D_SNAPSHOT, image.toPNG());
+        console.log(`[owl3d] snapshot saved to ${process.env.OWL3D_SNAPSHOT}`);
+        app.quit();
+      }, Number(process.env.OWL3D_SNAPSHOT_DELAY || 12000))
+    );
+  }
   portal.once('ready-to-show', () => {
     placePortal();
     portal.showInactive();

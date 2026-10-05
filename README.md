@@ -97,6 +97,17 @@ cannot be confused. If the live socket drops, resuming the simulation restores
 the demo fleet, and a top-bar reconnect control re-attaches the live stream
 once the bridge is back.
 
+## Owl3D stereo portal
+
+`npm run owl3d` starts HAL · Owl3D, an always-on 3D window for the Owl3D
+Shift glasses-free monitor (side-by-side stereo) or any screen (mono). HAL
+lives in a grid room behind the glass: it plugs into an inner computer that
+rises through the floor to think and read, builds blocks with swiss-army arms
+for each tool call, types replies at a cyberdesk, and delivers finished work
+to it. The eye is your HAL Studio design mapped onto layered lens shells, the
+shapes come from a Blender kit you can sculpt, and the bridge now streams
+Claude Code sessions as well as Codex. See [docs/owl3d.md](docs/owl3d.md).
+
 ## Quality commands
 
 ```bash

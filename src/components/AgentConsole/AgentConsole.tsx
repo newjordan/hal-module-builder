@@ -14,6 +14,7 @@ import {
   Clock3,
   Code2,
   Cpu,
+  Cuboid,
   GitBranch,
   MessageSquareText,
   Network,
@@ -381,6 +382,14 @@ function Header({
         >
           {desktopAlertsEnabled ? <BellRing size={17} /> : <Bell size={17} />}
         </IconButton>
+        <a
+          className='icon-button'
+          href='/owl3d.html'
+          aria-label='Open the Owl3D stereo portal'
+          title='Open the Owl3D stereo portal'
+        >
+          <Cuboid size={17} />
+        </a>
       </div>
     </header>
   );
