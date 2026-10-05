@@ -115,10 +115,11 @@ the Shift's 3D is weakest at its edges), and HAL steers away from them.
   a low double buzz (and an amber blinking dome) that the mic heard nothing.
 - **Stop:** the block on the desk lights up while HAL speaks; press it (or
   HAL) to cut it off.
-- **The waveform:** light bars projected from the desk show the conversation
-  as sound: your voice in cyan, HAL's in red, a slow pulse in HAL's state
-  color while it works, near flat when idle. HAL comes to center stage above
-  it to talk with you.
+- **Sound in the ceiling:** the equalizer is built into the grid ceiling.
+  Its central panels sit flush and dark in silence; with sound they drop a
+  little and their undersides glow (your voice cyan, HAL's red), the newest
+  sound at the front, rippling back along the depth of the room. HAL comes
+  to center stage to talk with you.
 
 Presses are ray-cast into the scene (from the matching eye in stereo). The
 microphone choice and hands-free listening are in the menu bar menu.

@@ -34,7 +34,12 @@ import { updateBlocks } from './plot';
 import { Desk, Hatch } from './station';
 import { clock, scene } from './stage';
 import { Voice, type VoiceState } from './voice/voice';
-import { buildRoom, createDust, gridUniforms } from './world';
+import {
+  buildRoom,
+  createCeilingEqualizer,
+  createDust,
+  gridUniforms,
+} from './world';
 
 /* Host API from the Electron shell (electron/owl3d/preload.cjs). */
 interface SpokenLine {
@@ -100,6 +105,7 @@ buildRoom();
 // Built after models load so they use the Blender kit; see rebuildStation().
 const station: Station = { desk: new Desk(), hatch: new Hatch() };
 const updateDust = createDust();
+const updateCeiling = createCeilingEqualizer();
 const voice = new Voice();
 /**
  * Push-to-talk, shared by the ● button, the . key and ⌘⌥.: hold to talk and
@@ -561,26 +567,18 @@ function frame(time: number): void {
     recording: voice.state === 'recording',
     speaking: talking,
     level: voice.state === 'recording' ? voice.micLevel : 0,
-    halLevel: talking ? voice.outLevel : 0,
     noMic: Boolean(voice.warning),
     ready:
       voice.state !== 'off' &&
       voice.state !== 'loading' &&
       voice.state !== 'error',
   });
-  // Between conversations the hologram pulses with what the agent in focus
-  // is doing.
-  const focus = partner ?? bots.values().next().value;
-  const busy = Boolean(
-    focus &&
-      settings.hud &&
-      focus.state !== 'idle' &&
-      focus.state !== 'offline' &&
-      focus.state !== 'completed'
-  );
-  station.desk.activity(
-    focus ? STATE_COLORS[focus.state] : STATE_COLORS.idle,
-    busy
+  // Sound lights the ceiling: your voice in cyan, HAL's in red.
+  const recording = voice.state === 'recording';
+  updateCeiling(
+    dt,
+    recording ? voice.micLevel : talking ? voice.outLevel : 0,
+    recording ? 0x53d8df : 0xff625f
   );
   updateDust(now, dt);
   worldModels.forEach(model => {

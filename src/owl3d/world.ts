@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BACKGROUND, D, H, MAX_BOTS, ROOM, W } from './config';
 import { glowTexture } from './fx';
-import { rand, scene } from './stage';
+import { damp, rand, scene } from './stage';
 
 const PULSES = 6;
 
@@ -281,5 +281,88 @@ export function createDust(count = 420): (now: number, dt: number) => void {
       if ((positions[y] ?? 0) > ROOM.ceil) positions[y] = ROOM.floor;
     }
     attribute.needsUpdate = true;
+  };
+}
+
+/**
+ * The equalizer lives in the grid ceiling. Its cells sit flush and dark in
+ * silence; when there is sound (your voice, HAL's voice) they push down out
+ * of the ceiling. The newest sound enters at the front row and travels back
+ * along the depth of the room, so the ceiling ripples away from you. Only
+ * the central columns move, keeping the screen's corners quiet.
+ */
+export function createCeilingEqualizer(): (
+  dt: number,
+  level: number,
+  color: THREE.ColorRepresentation
+) => void {
+  const columns = [-3, -1, 1, 3];
+  // Start a few cells back from the glass, so nothing hangs over the
+  // viewer's head at the top edge of the panel.
+  const rows: number[] = [];
+  for (let z = -5; z > ROOM.back; z -= 2) rows.push(z);
+  const count = columns.length * rows.length;
+  // Dark metal sides; only the underside glows, like a light panel.
+  const side = new THREE.MeshStandardMaterial({
+    color: 0x0b0e13,
+    metalness: 0.7,
+    roughness: 0.35,
+  });
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x000000,
+    emissive: 0xffffff,
+    emissiveIntensity: 0,
+    roughness: 0.6,
+  });
+  // BoxGeometry face groups: +x, -x, +y, -y (the underside), +z, -z.
+  const cells = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1.5, 1, 1.5),
+    [side, side, side, material, side, side],
+    count
+  );
+  cells.frustumCulled = false;
+  scene.add(cells);
+  // One sample per row: row 0 is now, deeper rows are the recent past.
+  const history = new Float32Array(rows.length);
+  const tint = new THREE.Color();
+  const matrix = new THREE.Matrix4();
+  const at = new THREE.Vector3();
+  const size = new THREE.Vector3();
+  const still = new THREE.Quaternion();
+  const MAX_DROP = 1.0;
+  let travel = 0;
+
+  return (dt, level, color) => {
+    tint.set(color);
+    material.emissive.lerp(tint, damp(8, dt));
+    const now = Math.min(1, level);
+    history[0] = (history[0] ?? 0) + (now - (history[0] ?? 0)) * damp(22, dt);
+    // The wave moves back one row about every 45 ms.
+    travel += dt;
+    while (travel > 0.045) {
+      travel -= 0.045;
+      for (let i = history.length - 1; i > 0; i--)
+        history[i] = history[i - 1] ?? 0;
+    }
+    let loudest = 0;
+    rows.forEach((z, row) => {
+      const sample = history[row] ?? 0;
+      loudest = Math.max(loudest, sample);
+      columns.forEach((x, column) => {
+        // Inner columns reach further than outer ones.
+        const reach = Math.abs(x) < 2 ? 1 : 0.65;
+        const drop = Math.max(0.0001, sample * reach * MAX_DROP);
+        at.set(x, ROOM.ceil - drop / 2 + 0.001, z);
+        size.set(1, drop, 1);
+        cells.setMatrixAt(
+          row * columns.length + column,
+          matrix.compose(at, still, size)
+        );
+      });
+    });
+    cells.instanceMatrix.needsUpdate = true;
+    // Bright enough to glow, low enough to keep the color (red, cyan).
+    material.emissiveIntensity = 0.35 + loudest * 0.9;
+    cells.visible = loudest > 0.004;
   };
 }
