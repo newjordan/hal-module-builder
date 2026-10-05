@@ -36,6 +36,11 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       include: ['react', 'react-dom'],
+      // Whisper runs in a module worker; let it load transformers.js as is.
+      exclude: ['@huggingface/transformers'],
+    },
+    worker: {
+      format: 'es',
     },
   };
 });

@@ -65,6 +65,8 @@ export interface PortalSettings {
   /** Each half is stretched to full width by the panel (the Owl3D Shift does). */
   squeeze: boolean;
   hud: boolean;
+  /** Listen on the microphone (Whisper) and talk back. */
+  voice: boolean;
 }
 
 export const DEFAULT_SETTINGS: PortalSettings = {
@@ -74,4 +76,5 @@ export const DEFAULT_SETTINGS: PortalSettings = {
   swapEyes: false,
   squeeze: true,
   hud: true,
+  voice: false,
 };

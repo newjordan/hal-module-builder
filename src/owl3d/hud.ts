@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { STATE_COLORS, toolColor } from './config';
 import type { Bot, PortalEvent } from './bot';
 import { MONO_FONT, UI_FONT, textSurface } from './fx';
-import { cssColor, scene } from './stage';
+import { clamp, clock, cssColor, damp, scene } from './stage';
 
 interface LogEntry {
   at: number;
@@ -25,6 +25,7 @@ export class Hud {
   private readonly surface = textSurface(1600, 720);
   private readonly log: LogEntry[] = [];
   private notice = '';
+  private voice = { label: '', color: 0x8a97a3 };
   private dirty = true;
   private drawnSecond = -1;
 
@@ -69,6 +70,19 @@ export class Hud {
     this.dirty = true;
   }
 
+  /** A spoken line in the log: you, or HAL. */
+  say(who: string, text: string, color: number): void {
+    this.log.unshift({ at: Date.now(), callsign: who, title: text, color });
+    this.log.length = Math.min(this.log.length, 6);
+    this.dirty = true;
+  }
+
+  /** Microphone status shown in the title row. */
+  setVoice(label: string, color: number): void {
+    this.voice = { label, color };
+    this.dirty = true;
+  }
+
   draw(bots: readonly Bot[], connection: string): void {
     const second = Math.floor(Date.now() / 1000);
     if (!this.dirty && second === this.drawnSecond) return;
@@ -96,6 +110,10 @@ export class Hud {
     g.font = `500 30px ${MONO_FONT}`;
     g.fillStyle = connection === 'live' ? '#62d995' : '#8a97a3';
     g.fillText(connection.toUpperCase(), 420, 78);
+    if (this.voice.label) {
+      g.fillStyle = cssColor(this.voice.color);
+      g.fillText(this.voice.label, 640, 78, 600);
+    }
     g.font = `500 40px ${MONO_FONT}`;
     g.textAlign = 'right';
     g.fillStyle = '#8a97a3';
@@ -150,5 +168,80 @@ export class Hud {
       g.fillText(this.notice, 56, canvas.height - 34, canvas.width - 100);
     }
     texture.needsUpdate = true;
+  }
+}
+
+/** Subtitles for the conversation: what you said, what HAL says back. */
+export class Caption {
+  readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private readonly surface = textSurface(2048, 360);
+  private until = 0;
+
+  constructor() {
+    this.mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(8.4, 1.48),
+      new THREE.MeshBasicMaterial({
+        map: this.surface.texture,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      })
+    );
+    this.mesh.position.set(3.3, 3.55, -0.6);
+    this.mesh.rotation.y = -0.1;
+    this.mesh.renderOrder = 11;
+    scene.add(this.mesh);
+  }
+
+  show(who: string, text: string, color: number, seconds?: number): void {
+    const { canvas, g, texture } = this.surface;
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.fillStyle = 'rgba(7,9,11,0.78)';
+    g.strokeStyle = cssColor(color);
+    g.lineWidth = 5;
+    g.beginPath();
+    g.roundRect(4, 4, canvas.width - 8, canvas.height - 8, 36);
+    g.fill();
+    g.stroke();
+    g.textBaseline = 'alphabetic';
+    g.textAlign = 'left';
+    g.font = `700 46px ${MONO_FONT}`;
+    g.fillStyle = cssColor(color);
+    g.fillText(who, 48, 84);
+    // Word-wrap into at most three lines; the last one ellipsizes.
+    g.font = `500 62px ${UI_FONT}`;
+    const width = canvas.width - 96;
+    const lines: string[] = [];
+    let line = '';
+    for (const word of text.split(/\s+/)) {
+      const next = line ? `${line} ${word}` : word;
+      if (g.measureText(next).width <= width || !line) line = next;
+      else {
+        lines.push(line);
+        line = word;
+      }
+    }
+    if (line) lines.push(line);
+    if (lines.length > 3) {
+      lines.length = 3;
+      lines[2] = `${lines[2]}…`;
+    }
+    g.fillStyle = '#eef1f3';
+    lines.forEach((text, i) => g.fillText(text, 48, 168 + i * 78, width));
+    texture.needsUpdate = true;
+    const words = text.split(/\s+/).length;
+    this.until = clock.now + (seconds ?? clamp(2.5 + words * 0.35, 3, 14));
+  }
+
+  /** Keep it up while HAL is still talking. */
+  hold(seconds: number): void {
+    this.until = Math.max(this.until, clock.now + seconds);
+  }
+
+  update(dt: number): void {
+    const material = this.mesh.material;
+    const target = clock.now < this.until ? 1 : 0;
+    material.opacity += (target - material.opacity) * damp(6, dt);
+    this.mesh.visible = material.opacity > 0.01;
   }
 }

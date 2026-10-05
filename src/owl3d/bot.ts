@@ -161,6 +161,10 @@ export class Bot {
   scale = 0.3;
   lastSeen = clock.now;
   scanTile: THREE.Vector3 | null = null;
+  /** 0..1 audio driving the eye during conversation (your voice or HAL's). */
+  voiceLevel = 0;
+  /** True while in conversation: HAL turns to face you. */
+  facingViewer = false;
   readonly color = new THREE.Color(STATE_COLORS.idle);
   readonly plot: Plot;
 
@@ -993,6 +997,7 @@ export class Bot {
 
   update(now: number, dt: number): void {
     const { energy, speed, bob, roll } = this.behave(now);
+    if (this.facingViewer) this.lookAt.copy(VIEWER);
     const pos = this.position;
 
     if (this.mode !== 'depart' && this.mode !== 'emerge') {
@@ -1047,7 +1052,9 @@ export class Bot {
       );
     }
     this.color.lerp(this.colorTarget, damp(4, dt));
-    this.energy += (energy - this.energy) * damp(6, dt);
+    this.energy +=
+      (Math.max(energy, this.voiceLevel) - this.energy) *
+      damp(this.voiceLevel > 0.05 ? 18 : 6, dt);
     const dim = this.mode === 'nap' ? 0.35 + 0.15 * Math.sin(now * 0.9) : 1;
 
     if (now > this.nextBlink) {
@@ -1066,7 +1073,7 @@ export class Bot {
       this.energy * dim,
       this.color,
       idleRed ? 0 : 0.7,
-      this.mode === 'speak'
+      this.mode === 'speak' || this.voiceLevel > 0.05
     );
     this.halo.material.color.copy(this.color);
     this.halo.material.opacity = (0.16 + this.energy * 0.3) * dim;

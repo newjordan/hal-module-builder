@@ -14,6 +14,7 @@
 
 const fs = require('node:fs');
 const net = require('node:net');
+const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const {
@@ -27,6 +28,7 @@ const {
   protocol,
   screen,
   shell,
+  systemPreferences,
 } = require('electron');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -44,7 +46,17 @@ const DEFAULTS = {
   squeeze: true,
   hud: true,
   displayId: null,
+  voice: true,
 };
+
+// Voice link (see scripts/hal-voice.mjs): what you say is appended to the
+// inbox for a connected agent session; lines appended to the outbox are
+// spoken by HAL through the speakers.
+const VOICE_DIR = process.env.HAL_VOICE_DIR || path.join(os.homedir(), '.hal', 'voice');
+const INBOX = path.join(VOICE_DIR, 'inbox.jsonl');
+const OUTBOX = path.join(VOICE_DIR, 'outbox.jsonl');
+const VOICE_NAME = process.env.HAL_VOICE || 'Daniel';
+const VOICE_RATE = Number(process.env.HAL_VOICE_RATE || 172);
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -98,6 +110,7 @@ function saveSettings() {
 }
 
 function update(patch) {
+  if (patch.voice && !settings.voice) void ensureMicrophone();
   const placementChanged =
     (patch.mode && patch.mode !== settings.mode) ||
     ('displayId' in patch && patch.displayId !== settings.displayId);
@@ -344,6 +357,7 @@ function rebuildTray() {
       toggle('Swap eyes', 'swapEyes'),
       toggle('Anamorphic halves', 'squeeze'),
       toggle('Show HUD', 'hud'),
+      { ...toggle('Listen on Microphone', 'voice'), accelerator: 'Command+Alt+M' },
       {
         label: 'Depth',
         submenu: [0.3, 0.5, 0.7, 1, 1.3].map(depth => ({
@@ -366,6 +380,7 @@ function rebuildTray() {
       { label: 'Open HAL Studio', click: () => openAppWindow('studio', 'HAL Studio') },
       { label: 'Open Agent Console', click: () => openAppWindow('', 'HAL Agent Console') },
       { label: 'Open Models Folder', click: () => shell.openPath(MODELS) },
+      { label: 'Open Voice Folder', click: () => shell.openPath(VOICE_DIR) },
       { label: 'Play Demo Shift', click: () => portal?.webContents.send('owl3d:demo') },
       { label: 'Reload Portal', click: () => portal?.webContents.reload() },
       { type: 'separator' },
@@ -373,6 +388,149 @@ function rebuildTray() {
     ])
   );
 }
+
+/* ------------------------------- voice ------------------------------- */
+
+async function ensureMicrophone() {
+  if (process.platform !== 'darwin') return true;
+  const status = systemPreferences.getMediaAccessStatus('microphone');
+  if (status === 'granted') return true;
+  if (status === 'not-determined') return systemPreferences.askForMediaAccess('microphone');
+  console.warn(`[owl3d] microphone access is ${status}; allow it in System Settings → Privacy & Security → Microphone`);
+  return false;
+}
+
+function voiceLine(text, extra = {}) {
+  return {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    at: new Date().toISOString(),
+    text,
+    ...extra,
+  };
+}
+
+function appendInbox(text) {
+  fs.mkdirSync(VOICE_DIR, { recursive: true });
+  fs.appendFileSync(INBOX, `${JSON.stringify(voiceLine(text, { source: 'owl3d-mic' }))}\n`);
+}
+
+/** Render a line with macOS `say` to 22 kHz WAV bytes. */
+function synthesize(text) {
+  return new Promise((resolve, reject) => {
+    const file = path.join(os.tmpdir(), `hal-say-${process.pid}-${Date.now()}.wav`);
+    const child = spawn('say', [
+      '-v', VOICE_NAME,
+      '-r', String(VOICE_RATE),
+      '-o', file,
+      '--file-format=WAVE',
+      '--data-format=LEI16@22050',
+      '-f', '-',
+    ]);
+    child.on('error', reject);
+    child.on('exit', code => {
+      try {
+        if (code !== 0) throw new Error(`say exited with ${code}`);
+        const audio = fs.readFileSync(file);
+        resolve(audio);
+      } catch (error) {
+        reject(error);
+      } finally {
+        fs.rmSync(file, { force: true });
+      }
+    });
+    child.stdin.end(text);
+  });
+}
+
+const speechQueue = [];
+const spokenWaiters = new Map();
+let speechBusy = false;
+
+async function pumpSpeech() {
+  if (speechBusy) return;
+  const line = speechQueue.shift();
+  if (!line) return;
+  speechBusy = true;
+  try {
+    if (portal && !portal.isDestroyed()) {
+      const audio = await synthesize(line.text);
+      const seconds = Math.max(0, audio.length - 44) / (22050 * 2);
+      await new Promise(resolve => {
+        spokenWaiters.set(line.id, resolve);
+        setTimeout(resolve, seconds * 1000 + 5000);
+        portal.webContents.send('owl3d:speak', { ...line, audio });
+      });
+      spokenWaiters.delete(line.id);
+    } else {
+      // No portal to animate: just talk.
+      await new Promise(resolve => {
+        const child = spawn('say', ['-v', VOICE_NAME, '-r', String(VOICE_RATE), '-f', '-']);
+        child.on('exit', resolve);
+        child.on('error', resolve);
+        child.stdin.end(line.text);
+      });
+    }
+  } catch (error) {
+    console.error(`[owl3d] speech failed: ${error.message}`);
+  }
+  speechBusy = false;
+  void pumpSpeech();
+}
+
+/** Follow the outbox from its current end; each new line is spoken. */
+function watchOutbox() {
+  fs.mkdirSync(VOICE_DIR, { recursive: true });
+  let offset = fs.existsSync(OUTBOX) ? fs.statSync(OUTBOX).size : 0;
+  let carry = '';
+  setInterval(() => {
+    let size;
+    try {
+      size = fs.statSync(OUTBOX).size;
+    } catch {
+      return;
+    }
+    if (size < offset) {
+      offset = 0;
+      carry = '';
+    }
+    if (size === offset) return;
+    const buffer = Buffer.alloc(size - offset);
+    const fd = fs.openSync(OUTBOX, 'r');
+    try {
+      fs.readSync(fd, buffer, 0, buffer.length, offset);
+    } finally {
+      fs.closeSync(fd);
+    }
+    offset = size;
+    const lines = (carry + buffer.toString('utf8')).split('\n');
+    carry = lines.pop() || '';
+    for (const raw of lines) {
+      try {
+        const line = JSON.parse(raw);
+        const text = typeof line.text === 'string' ? line.text.trim().slice(0, 2000) : '';
+        if (!text) continue;
+        speechQueue.push({
+          id: String(line.id || voiceLine(text).id),
+          text,
+          ...(typeof line.agentId === 'string' ? { agentId: line.agentId } : {}),
+        });
+      } catch {
+        /* a half-written or foreign line */
+      }
+    }
+    void pumpSpeech();
+  }, 250);
+}
+
+ipcMain.on('owl3d:heard', (_event, text) => {
+  if (typeof text !== 'string' || !text.trim() || text.length > 2000) return;
+  appendInbox(text.trim());
+  console.log(`[owl3d] heard: ${text.trim()}`);
+});
+
+ipcMain.on('owl3d:spoken', (_event, id) => {
+  spokenWaiters.get(id)?.();
+});
 
 /* ------------------------------- boot -------------------------------- */
 
@@ -395,6 +553,8 @@ app.whenReady().then(async () => {
     }
     serveDist();
   }
+  watchOutbox();
+  if (settings.voice) await ensureMicrophone();
   createPortal();
   tray = new Tray(trayIcon());
   tray.setToolTip('HAL · Owl3D');
@@ -402,6 +562,7 @@ app.whenReady().then(async () => {
   globalShortcut.register('CommandOrControl+Alt+H', () =>
     update({ mode: settings.mode === 'sbs' ? 'window' : 'sbs' })
   );
+  globalShortcut.register('CommandOrControl+Alt+M', () => update({ voice: !settings.voice }));
   for (const change of ['display-added', 'display-removed', 'display-metrics-changed']) {
     screen.on(change, () => {
       placePortal();

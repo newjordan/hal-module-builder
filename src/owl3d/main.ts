@@ -23,7 +23,7 @@ import { runDemo } from './demo';
 import { setEyeRenderer } from './eye';
 import { bridgeUrl, connectAgentEvents, type ConnectionLabel } from './events';
 import { particles } from './fx';
-import { Hud } from './hud';
+import { Caption, Hud } from './hud';
 import {
   DESIGN_STORAGE_KEY,
   planEye,
@@ -34,13 +34,25 @@ import { ModelInstance, modelLibrary } from './models';
 import { updateBlocks } from './plot';
 import { Desk, Hatch } from './station';
 import { clock, scene } from './stage';
+import { Voice, type VoiceState } from './voice/voice';
 import { buildRoom, createDust, gridUniforms } from './world';
 
 /* Host API from the Electron shell (electron/owl3d/preload.cjs). */
+interface SpokenLine {
+  id: string;
+  text: string;
+  agentId?: string;
+  audio: Uint8Array;
+}
 interface Owl3dHost {
   onSettings(callback: (settings: Partial<PortalSettings>) => void): void;
   onDemo(callback: () => void): void;
   update(patch: Partial<PortalSettings>): void;
+  /** What you said, for the connected agent session's inbox. */
+  heard?(text: string): void;
+  /** HAL's lines from the outbox, rendered to speech by the shell. */
+  onSpeak?(callback: (line: SpokenLine) => void): void;
+  spoken?(id: string): void;
 }
 declare global {
   interface Window {
@@ -84,6 +96,8 @@ buildRoom();
 const station: Station = { desk: new Desk(), hatch: new Hatch() };
 const updateDust = createDust();
 const hud = new Hud();
+const caption = new Caption();
+const voice = new Voice();
 
 /* ----------------------------- settings ----------------------------- */
 
@@ -110,6 +124,8 @@ function applySettings(next: Partial<PortalSettings>): void {
   document.body.dataset.mode = settings.mode;
   hud.mesh.visible = settings.hud;
   hud.touch();
+  if (settings.voice && voice.state === 'off') void voice.start();
+  if (!settings.voice && voice.state !== 'off') voice.stop();
 }
 
 function updateSettings(patch: Partial<PortalSettings>): void {
@@ -259,6 +275,51 @@ if (host) {
   host.onDemo(demo);
 }
 
+/* ------------------------------- voice ------------------------------- */
+
+const VOICE_LABELS: Record<VoiceState, [string, number]> = {
+  off: ['', 0x8a97a3],
+  starting: ['MIC STARTING', 0x8a97a3],
+  loading: ['MIC LOADING', 0xf2b84b],
+  listening: ['MIC LISTENING', 0x62d995],
+  hearing: ['MIC HEARING YOU', 0x53d8df],
+  transcribing: ['MIC TRANSCRIBING', 0x53d8df],
+  speaking: ['HAL SPEAKING', 0xff625f],
+  error: ['MIC ERROR', 0xff625f],
+};
+
+/** The bot in the conversation: whoever last spoke, else the first. */
+let voiceAgent = '';
+function voiceBot(): Bot | undefined {
+  return bots.get(voiceAgent) ?? bots.values().next().value;
+}
+
+voice.onChange = () => {
+  const [label, color] = VOICE_LABELS[voice.state];
+  hud.setVoice(
+    label && voice.detail ? `${label} · ${voice.detail}` : label,
+    color
+  );
+};
+
+voice.onHeard = text => {
+  caption.show('YOU', text, 0x53d8df);
+  hud.say('YOU', text, 0x53d8df);
+  if (host?.heard) host.heard(text);
+  else console.info('[owl3d] heard:', text);
+};
+
+host?.onSpeak?.(line => {
+  if (line.agentId && bots.has(line.agentId)) voiceAgent = line.agentId;
+  caption.show(voiceBot()?.callsign ?? 'HAL', line.text, 0xff625f);
+  hud.say(voiceBot()?.callsign ?? 'HAL', line.text, 0xff625f);
+  const audio = line.audio.buffer.slice(
+    line.audio.byteOffset,
+    line.audio.byteOffset + line.audio.byteLength
+  ) as ArrayBuffer;
+  void voice.play(audio).finally(() => host.spoken?.(line.id));
+});
+
 window.addEventListener('keydown', event => {
   switch (event.key.toLowerCase()) {
     case 's':
@@ -294,6 +355,9 @@ window.addEventListener('keydown', event => {
       break;
     case 'd':
       demo();
+      break;
+    case 'm':
+      updateSettings({ voice: !settings.voice });
       break;
     case 'f':
       if (!host)
@@ -357,6 +421,18 @@ function frame(time: number): void {
   );
   station.desk.update(dt, glowBot?.color ?? homeColor, glowBot?.energy ?? 0.2);
   particles.update(dt);
+  voice.update();
+  const talking = voice.state === 'speaking';
+  const listeningToYou =
+    voice.state === 'hearing' || voice.state === 'transcribing';
+  const partner = voiceBot();
+  for (const bot of bots.values()) {
+    const engaged = bot === partner && (talking || listeningToYou);
+    bot.facingViewer = engaged;
+    bot.voiceLevel = !engaged ? 0 : talking ? voice.outLevel : voice.micLevel;
+  }
+  if (talking) caption.hold(0.8);
+  caption.update(dt);
   updateDust(now, dt);
   worldModels.forEach(model => {
     model.play('idle', 'world');
@@ -435,6 +511,30 @@ function frame(time: number): void {
 requestAnimationFrame(frame);
 
 // Handy from devtools: halOwl3d.emit({...}), halOwl3d.demo()
+// Debug and test hooks for the voice path.
+const voiceHooks = {
+  /** Transcribe any audio file by URL or bytes, exactly as the mic path does. */
+  async transcribe(source: string | ArrayBuffer): Promise<string> {
+    const data =
+      typeof source === 'string'
+        ? await (await fetch(source)).arrayBuffer()
+        : source;
+    return voice.transcribe(await Voice.toMono16k(data));
+  },
+  /** Pretend you said something. */
+  heard(text: string): void {
+    voice.onHeard?.(text);
+  },
+  /** Speak through the browser voice (no shell). */
+  say(text: string): Promise<void> {
+    caption.show('HAL', text, 0xff625f);
+    return voice.say(text);
+  },
+  get state(): VoiceState {
+    return voice.state;
+  },
+};
+
 Object.assign(window, {
   owl3d: {
     scene,
@@ -443,5 +543,6 @@ Object.assign(window, {
     demo,
     models: modelLibrary,
     identity: HOME_IDENTITY,
+    voice: voiceHooks,
   },
 });
