@@ -74,8 +74,10 @@ export interface PortalSettings {
   voice: boolean;
   /** Listen all the time instead of push-to-talk. */
   handsFree: boolean;
-  /** Microphone by label; '' is the system default. */
+  /** Microphone by label, or 'remote:<id>' for a Tailscale mic; '' is the system default. */
   micLabel: string;
+  /** '' plays HAL here; 'remote:<id>' plays it on a Tailscale speaker. */
+  speaker: string;
 }
 
 export const DEFAULT_SETTINGS: PortalSettings = {
@@ -88,4 +90,5 @@ export const DEFAULT_SETTINGS: PortalSettings = {
   voice: false,
   handsFree: false,
   micLabel: '',
+  speaker: '',
 };

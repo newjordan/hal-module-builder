@@ -59,11 +59,28 @@ class HalMicTap extends AudioWorkletProcessor {
 registerProcessor('hal-mic-tap', HalMicTap);
 `;
 
-interface Mic {
-  context: AudioContext;
-  stream: MediaStream;
-  node: AudioWorkletNode;
+/** A microphone on this machine, or one streamed over the network. */
+type Mic =
+  | {
+      kind: 'local';
+      context: AudioContext;
+      stream: MediaStream;
+      node: AudioWorkletNode;
+    }
+  | { kind: 'remote'; id: string };
+
+/** The shell side of network audio (Tailscale mics and speakers). */
+export interface RemoteAudio {
+  startMic(id: string): void;
+  stopMic(): void;
+  /** Play a cue on the remote speaker; false when sound stays local. */
+  cue(kind: CueKind): boolean;
 }
+
+export type CueKind = 'start' | 'send' | 'cancel' | 'error';
+
+/** Network mics are named 'remote:<id>' in the input setting. */
+const REMOTE_PREFIX = 'remote:';
 
 function concat(chunks: readonly Float32Array[]): Float32Array {
   const out = new Float32Array(
@@ -94,6 +111,7 @@ export class Voice {
   onHeard: ((text: string) => void) | null = null;
 
   private enabled = false;
+  private remote: RemoteAudio | null = null;
   /** Preferred input by label; '' is the system default. */
   private inputLabel = '';
   private peak = 0;
@@ -112,6 +130,7 @@ export class Voice {
   private readonly pending = new Map<number, (text: string) => void>();
   private output: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private outGain: GainNode | null = null;
   private wave = new Float32Array(1024);
   private deafUntil = 0;
   private speaking = 0;
@@ -249,9 +268,53 @@ export class Voice {
     this.onChange?.();
   }
 
+  /** Hook up the shell's network audio. */
+  setRemote(remote: RemoteAudio): void {
+    this.remote = remote;
+  }
+
+  /** Samples from a network mic: 16 kHz mono s16 little-endian. */
+  feedRemote(bytes: Uint8Array): void {
+    if (this.mic?.kind !== 'remote') return;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const samples = new Float32Array(Math.floor(bytes.byteLength / 2));
+    for (let i = 0; i < samples.length; i++)
+      samples[i] = view.getInt16(i * 2, true) / 32768;
+    this.hear(samples);
+  }
+
+  /** The network mic hung up (or never answered). */
+  remoteClosed(): void {
+    if (this.mic?.kind !== 'remote') return;
+    const { id } = this.mic;
+    this.mic = null;
+    if (this.handsFree && this.enabled)
+      window.setTimeout(() => {
+        if (!this.mic && this.handsFree && this.enabled) void this.openMic();
+      }, 3000);
+    if (!this.recordingNow) return;
+    if (this.recorded) return this.endRecording();
+    this.recordingNow = false;
+    this.chunks = [];
+    this.warning = `No sound from ${id}. Is it up on Tailscale?`;
+    this.cue('error');
+    this.set(this.resting());
+  }
+
   private openMic(): Promise<Mic | null> {
     window.clearTimeout(this.closeTimer);
     if (this.mic) return Promise.resolve(this.mic);
+    if (this.inputLabel.startsWith(REMOTE_PREFIX)) {
+      const id = this.inputLabel.slice(REMOTE_PREFIX.length);
+      if (!this.remote) {
+        this.set('error', 'Network microphones need the Owl3D shell');
+        return Promise.resolve(null);
+      }
+      this.remote.startMic(id);
+      this.inputName = `${id} (network)`;
+      this.mic = { kind: 'remote', id };
+      return Promise.resolve(this.mic);
+    }
     this.opening ??= (async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -288,7 +351,7 @@ export class Voice {
           .connect(node)
           .connect(mute)
           .connect(context.destination);
-        this.mic = { context, stream, node };
+        this.mic = { kind: 'local', context, stream, node };
         return this.mic;
       } catch (error) {
         this.set(
@@ -306,9 +369,13 @@ export class Voice {
   private closeMic(): void {
     window.clearTimeout(this.closeTimer);
     if (!this.mic) return;
-    this.mic.stream.getTracks().forEach(track => track.stop());
-    this.mic.node.port.onmessage = null;
-    void this.mic.context.close();
+    if (this.mic.kind === 'remote') {
+      this.remote?.stopMic();
+    } else {
+      this.mic.stream.getTracks().forEach(track => track.stop());
+      this.mic.node.port.onmessage = null;
+      void this.mic.context.close();
+    }
     this.mic = null;
     this.vad.reset();
     this.micLevel = 0;
@@ -415,7 +482,8 @@ export class Voice {
    * starts, a falling one when your words are sent, a soft low tone for a
    * tap too short to count, and a low double buzz when the mic is silent.
    */
-  cue(kind: 'start' | 'send' | 'cancel' | 'error'): void {
+  cue(kind: CueKind): void {
+    if (this.remote?.cue(kind)) return;
     try {
       this.output ??= new AudioContext();
       const output = this.output;
@@ -470,19 +538,25 @@ export class Voice {
     if ('speechSynthesis' in window) speechSynthesis.cancel();
   }
 
-  /** Play HAL's speech (WAV bytes); resolves when it has finished. */
-  play(audio: ArrayBuffer): Promise<void> {
+  /**
+   * Play HAL's speech (WAV bytes); resolves when it has finished. Muted
+   * playback still drives the eye and ceiling while a network speaker
+   * carries the sound.
+   */
+  play(audio: ArrayBuffer, muted = false): Promise<void> {
     const generation = this.generation;
     const run = async () => {
       if (generation !== this.generation) return;
       this.output ??= new AudioContext();
       const output = this.output;
       if (output.state === 'suspended') await output.resume();
-      if (!this.analyser) {
+      if (!this.analyser || !this.outGain) {
         this.analyser = output.createAnalyser();
         this.analyser.fftSize = 1024;
-        this.analyser.connect(output.destination);
+        this.outGain = output.createGain();
+        this.analyser.connect(this.outGain).connect(output.destination);
       }
+      this.outGain.gain.value = muted ? 0 : 1;
       const buffer = await output.decodeAudioData(audio.slice(0));
       if (generation !== this.generation) return;
       const source = output.createBufferSource();

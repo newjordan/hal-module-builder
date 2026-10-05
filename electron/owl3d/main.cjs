@@ -53,6 +53,8 @@ const DEFAULTS = {
   // Push-to-talk unless this is on.
   handsFree: false,
   micLabel: '',
+  // 'remote:<id>' plays HAL's voice on a Tailscale speaker (remote-audio.json).
+  speaker: '',
   // Off so Owl3D's Stereo 3D Playback can present its woven output on top.
   stereoOnTop: false,
 };
@@ -434,6 +436,29 @@ function rebuildTray() {
             checked: settings.micLabel === label,
             click: () => update({ micLabel: label }),
           })),
+          ...remoteAudio().mics.map(mic => ({
+            label: `${mic.label || mic.id} (Tailscale)`,
+            type: 'radio',
+            checked: settings.micLabel === `remote:${mic.id}`,
+            click: () => update({ micLabel: `remote:${mic.id}` }),
+          })),
+        ],
+      },
+      {
+        label: 'Speaker',
+        submenu: [
+          {
+            label: 'This Mac',
+            type: 'radio',
+            checked: !settings.speaker,
+            click: () => update({ speaker: '' }),
+          },
+          ...remoteAudio().speakers.map(speaker => ({
+            label: `${speaker.label || speaker.id} (Tailscale)`,
+            type: 'radio',
+            checked: settings.speaker === `remote:${speaker.id}`,
+            click: () => update({ speaker: `remote:${speaker.id}` }),
+          })),
         ],
       },
       { ...toggle('Hands-free Listening', 'handsFree'), accelerator: 'Command+Alt+M' },
@@ -526,6 +551,148 @@ function synthesize(text) {
   });
 }
 
+/* ---------------------------- remote audio ---------------------------- */
+
+// Mics and speakers on other machines (Tailscale), each a small service that
+// streams raw PCM: see docs/owl3d.md. Read fresh each time, so edits apply.
+const REMOTE_AUDIO = path.join(VOICE_DIR, 'remote-audio.json');
+
+function remoteAudio() {
+  try {
+    const config = JSON.parse(fs.readFileSync(REMOTE_AUDIO, 'utf8'));
+    const valid = entry =>
+      entry && typeof entry.id === 'string' && typeof entry.host === 'string' && Number.isInteger(entry.port);
+    return {
+      mics: Array.isArray(config.mics) ? config.mics.filter(valid) : [],
+      speakers: Array.isArray(config.speakers) ? config.speakers.filter(valid) : [],
+    };
+  } catch {
+    return { mics: [], speakers: [] };
+  }
+}
+
+function remoteSpeaker() {
+  if (!settings.speaker?.startsWith('remote:')) return null;
+  const id = settings.speaker.slice('remote:'.length);
+  return remoteAudio().speakers.find(speaker => speaker.id === id) ?? null;
+}
+
+/** The sample data of a 16-bit mono WAV file. */
+function wavSamples(wav) {
+  for (let i = 12; i + 8 <= wav.length; ) {
+    const id = wav.toString('ascii', i, i + 4);
+    const size = wav.readUInt32LE(i + 4);
+    if (id === 'data') return wav.subarray(i + 8, i + 8 + size);
+    i += 8 + size + (size & 1);
+  }
+  return wav.subarray(44);
+}
+
+/** Mono s16 → stereo s16, panned (-1 left … 1 right, constant power). */
+function panStereo(mono, pan = 0) {
+  const angle = ((Math.max(-1, Math.min(1, pan)) + 1) * Math.PI) / 4;
+  const left = Math.cos(angle);
+  const right = Math.sin(angle);
+  const count = Math.floor(mono.length / 2);
+  const out = Buffer.alloc(count * 4);
+  for (let i = 0; i < count; i++) {
+    const sample = mono.readInt16LE(i * 2);
+    out.writeInt16LE(Math.round(sample * left), i * 4);
+    out.writeInt16LE(Math.round(sample * right), i * 4 + 2);
+  }
+  return out;
+}
+
+/** Play 22.05 kHz stereo PCM on a remote speaker; resolves when it is done. */
+function playRemote(speaker, stereo) {
+  return new Promise(resolve => {
+    const socket = net.connect({ host: speaker.host, port: speaker.port });
+    socket.setNoDelay(true);
+    socket.on('connect', () => socket.end(stereo));
+    socket.on('error', error => {
+      console.warn(`[owl3d] speaker ${speaker.id}: ${error.message}`);
+      resolve();
+    });
+    socket.on('close', resolve);
+    socket.resume();
+  });
+}
+
+/** The portal's sound cues, rendered here for a remote speaker. */
+const CUES = {
+  start: [
+    [660, 0, 0.07],
+    [990, 0.08, 0.09],
+  ],
+  send: [
+    [880, 0, 0.07],
+    [560, 0.08, 0.11],
+  ],
+  cancel: [[330, 0, 0.09]],
+  error: [
+    [196, 0, 0.12],
+    [196, 0.17, 0.12],
+  ],
+};
+
+function cuePcm(kind) {
+  const notes = CUES[kind];
+  if (!notes) return null;
+  const rate = 22050;
+  const end = Math.max(...notes.map(([, at, length]) => at + length)) + 0.03;
+  const mono = Buffer.alloc(Math.ceil(end * rate) * 2);
+  const volume = kind === 'error' ? 0.18 : 0.22;
+  for (const [frequency, at, length] of notes) {
+    const from = Math.floor(at * rate);
+    const count = Math.floor(length * rate);
+    for (let i = 0; i < count; i++) {
+      const t = i / rate;
+      const envelope = Math.min(1, t / 0.01) * Math.exp(-5 * (t / length));
+      const wave = kind === 'error' ? Math.sign(Math.sin(2 * Math.PI * frequency * t)) : Math.sin(2 * Math.PI * frequency * t);
+      const index = (from + i) * 2;
+      const mixed = mono.readInt16LE(index) + wave * envelope * volume * 32767;
+      mono.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(mixed))), index);
+    }
+  }
+  return mono;
+}
+
+ipcMain.on('owl3d:cue', (_event, kind) => {
+  const speaker = remoteSpeaker();
+  const mono = typeof kind === 'string' ? cuePcm(kind) : null;
+  if (speaker && mono) void playRemote(speaker, panStereo(mono, speaker.pan ?? 0));
+});
+
+// A network mic: one TCP stream at a time, raw 16 kHz mono s16 to the portal.
+let remoteMicSocket = null;
+ipcMain.on('owl3d:remote-mic', (_event, request) => {
+  remoteMicSocket?.destroy();
+  remoteMicSocket = null;
+  if (!request?.on) return;
+  const mic = remoteAudio().mics.find(entry => entry.id === request.id);
+  if (!mic) {
+    portal?.webContents.send('owl3d:remote-mic-closed', { id: request.id, error: 'not in remote-audio.json' });
+    return;
+  }
+  const socket = net.connect({ host: mic.host, port: mic.port });
+  remoteMicSocket = socket;
+  socket.setNoDelay(true);
+  let odd = null;
+  socket.on('data', chunk => {
+    let data = odd ? Buffer.concat([odd, chunk]) : chunk;
+    odd = data.length % 2 ? data.subarray(data.length - 1) : null;
+    if (odd) data = data.subarray(0, data.length - 1);
+    if (data.length && portal && !portal.isDestroyed()) portal.webContents.send('owl3d:remote-mic-data', data);
+  });
+  socket.on('error', error => console.warn(`[owl3d] mic ${mic.id}: ${error.message}`));
+  socket.on('close', () => {
+    // Stopped or replaced on purpose: nothing to report.
+    if (remoteMicSocket !== socket) return;
+    remoteMicSocket = null;
+    if (portal && !portal.isDestroyed()) portal.webContents.send('owl3d:remote-mic-closed', { id: mic.id });
+  });
+});
+
 const speechQueue = [];
 const spokenWaiters = new Map();
 let speechBusy = false;
@@ -540,12 +707,19 @@ async function pumpSpeech() {
     if (portal && !portal.isDestroyed()) {
       const audio = await synthesize(line.text);
       const seconds = Math.max(0, audio.length - 44) / (22050 * 2);
+      const speaker = remoteSpeaker();
+      // On a remote speaker the portal still plays the line, silently, so
+      // HAL's eye and the ceiling move with its voice; it starts a beat
+      // later to line up with the network and the remote player.
+      const played = speaker ? playRemote(speaker, panStereo(wavSamples(audio), speaker.pan ?? 0)) : null;
+      if (speaker) await new Promise(resolve => setTimeout(resolve, 140));
       await new Promise(resolve => {
         spokenWaiters.set(line.id, resolve);
         setTimeout(resolve, seconds * 1000 + 5000);
-        portal.webContents.send('owl3d:speak', { ...line, audio });
+        portal.webContents.send('owl3d:speak', { ...line, audio, muted: Boolean(speaker) });
       });
       spokenWaiters.delete(line.id);
+      if (played) await played;
     } else {
       // No portal to animate: just talk.
       await new Promise(resolve => {

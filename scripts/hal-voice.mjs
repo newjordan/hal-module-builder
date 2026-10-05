@@ -3,8 +3,8 @@
  * Connect an agent session to HAL's voice.
  *
  *   hal-voice listen              print each thing you say to HAL, one line
- *                                 per utterance, as it is heard (pipe this
- *                                 into an agent's event monitor)
+ *                                 per utterance, as it is heard (run this
+ *                                 as an agent's event monitor, unfiltered)
  *   hal-voice say <text…>         HAL speaks <text> through the speakers
  *   hal-voice say --agent <id> …  …as the bot for that agent session
  *   hal-voice heard <text…>       pretend you said <text> (testing)
@@ -13,7 +13,7 @@
  * (both JSON lines in ~/.hal/voice, or HAL_VOICE_DIR). Nothing leaves the
  * machine.
  */
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, statSync, writeSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -98,11 +98,14 @@ async function main(argv) {
   }
   if (command === 'listen') {
     let cursor = endCursor(INBOX);
-    console.log(`[hal-voice] listening for speech in ${INBOX}`);
+    // One utterance per stdout line, written straight through so a monitor
+    // sees it at once; the banner goes to stderr so stdout needs no filter.
+    const emit = text => writeSync(1, `${text}\n`);
+    writeSync(2, `[hal-voice] listening for speech in ${INBOX}\n`);
     for (;;) {
       const next = readNew(INBOX, cursor);
       cursor = next.cursor;
-      for (const line of next.lines) console.log(`🎙 ${line.text.replace(/\s+/g, ' ')}`);
+      for (const line of next.lines) emit(`🎙 ${line.text.replace(/\s+/g, ' ')}`);
       await new Promise(resolve => setTimeout(resolve, 250));
     }
   }

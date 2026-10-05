@@ -13,4 +13,8 @@ contextBridge.exposeInMainWorld('halOwl3d', {
   spoken: id => ipcRenderer.send('owl3d:spoken', id),
   stopSpeaking: () => ipcRenderer.send('owl3d:stop-speaking'),
   setMics: list => ipcRenderer.send('owl3d:mics', list),
+  cue: kind => ipcRenderer.send('owl3d:cue', kind),
+  remoteMic: (id, on) => ipcRenderer.send('owl3d:remote-mic', { id, on }),
+  onRemoteMicData: callback => ipcRenderer.on('owl3d:remote-mic-data', (_event, data) => callback(data)),
+  onRemoteMicClosed: callback => ipcRenderer.on('owl3d:remote-mic-closed', (_event, info) => callback(info)),
 });

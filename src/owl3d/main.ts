@@ -33,7 +33,7 @@ import { ModelInstance, modelLibrary } from './models';
 import { updateBlocks } from './plot';
 import { Desk, Hatch } from './station';
 import { clock, scene } from './stage';
-import { Voice, type VoiceState } from './voice/voice';
+import { Voice, type CueKind, type VoiceState } from './voice/voice';
 import {
   buildRoom,
   createCeilingEqualizer,
@@ -47,6 +47,8 @@ interface SpokenLine {
   text: string;
   agentId?: string;
   audio: Uint8Array;
+  /** A network speaker has the sound; play silently to drive the eye. */
+  muted?: boolean;
 }
 interface Owl3dHost {
   onSettings(callback: (settings: Partial<PortalSettings>) => void): void;
@@ -63,6 +65,12 @@ interface Owl3dHost {
   stopSpeaking?(): void;
   /** The Mac's microphones, for the menu bar's Microphone menu. */
   setMics?(mics: string[], selected: string): void;
+  /** Play a cue on the network speaker. */
+  cue?(kind: CueKind): void;
+  /** Open or close a network mic (16 kHz mono s16 stream). */
+  remoteMic?(id: string, on: boolean): void;
+  onRemoteMicData?(callback: (bytes: Uint8Array) => void): void;
+  onRemoteMicClosed?(callback: () => void): void;
 }
 declare global {
   interface Window {
@@ -420,6 +428,20 @@ voice.onChange = () => {
   if (voice.warning) console.warn(`[owl3d] ${voice.warning}`);
 };
 
+// Tailscale audio: a mic streamed from another machine, and a speaker there
+// that carries HAL's voice and cues while the Mac plays along silently.
+voice.setRemote({
+  startMic: id => host?.remoteMic?.(id, true),
+  stopMic: () => host?.remoteMic?.('', false),
+  cue: kind => {
+    if (!settings.speaker.startsWith('remote:') || !host?.cue) return false;
+    host.cue(kind);
+    return true;
+  },
+});
+host?.onRemoteMicData?.(bytes => voice.feedRemote(bytes));
+host?.onRemoteMicClosed?.(() => voice.remoteClosed());
+
 voice.onHeard = text => {
   if (host?.heard) host.heard(text);
   else console.info('[owl3d] heard:', text);
@@ -433,7 +455,7 @@ host?.onSpeak?.(line => {
   ) as ArrayBuffer;
   console.info(`[owl3d] speaking ${line.id} (${line.audio.byteLength} bytes)`);
   void voice
-    .play(audio)
+    .play(audio, line.muted)
     .catch(error => console.error('[owl3d] speech playback failed:', error))
     .finally(() => {
       console.info(`[owl3d] spoke ${line.id}`);

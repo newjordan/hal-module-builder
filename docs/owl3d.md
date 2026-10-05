@@ -134,7 +134,7 @@ Whisper (base.en) on your machine: WebGPU on the Apple GPU, WebAssembly
 otherwise. Pressing while HAL talks cuts it off. HAL comes to center stage
 to face you while you talk, and its eye follows your voice.
 
-**Hands-free** (the dock toggle, `M` or `⌘⌥M`) keeps the microphone open
+**Hands-free** (`M`, `⌘⌥M` or the menu bar menu) keeps the microphone open
 instead; speech is detected by level against the room's noise floor and each
 sentence is sent when you pause. It is deaf while HAL talks.
 
@@ -143,9 +143,10 @@ The shell connects that to an agent session through two JSON-lines files in
 
 - `inbox.jsonl` gets one line per thing you say;
 - each line appended to `outbox.jsonl` is rendered with macOS `say` (voice
-  `HAL_VOICE`, default Daniel; rate `HAL_VOICE_RATE`) and spoken by HAL, with
-  subtitles, while its eye moves with its own voice. The microphone is deaf
-  while HAL talks.
+  `HAL_VOICE`, default Daniel; rate `HAL_VOICE_RATE`) and spoken by HAL
+  while its eye and the ceiling move with its voice. There are no subtitles:
+  the portal answers in sound and light only. The microphone is deaf while
+  HAL talks.
 
 `scripts/hal-voice.mjs` is the agent's side (`npm run hal-voice -- …`):
 
@@ -157,8 +158,57 @@ node scripts/hal-voice.mjs say --agent claude:<session> "…"  # as that session
 
 An agent that can watch a command's output (for example a Claude Code
 monitor on `hal-voice listen`) hears you as you speak and answers with
-`hal-voice say`. Everything stays on the machine; Whisper's model downloads
-once and the shell keeps it in `~/.hal/models`.
+`hal-voice say`. `listen` writes only utterances to stdout (its banner goes to
+stderr), so run it unfiltered: an inverted `grep --line-buffered -v` holds
+lines back under ugrep, which some Macs install as `grep`. Whisper's model
+downloads once and the shell keeps it in `~/.hal/models`; speech never leaves
+your machines.
+
+### A mic and speakers on another machine
+
+HAL can listen through a microphone and talk through speakers plugged into
+another machine on your Tailscale network. List them in
+`~/.hal/voice/remote-audio.json`:
+
+```json
+{
+  "mics": [
+    { "id": "atlas", "label": "heyday on atlas", "host": "100.64.51.8", "port": 7712 }
+  ],
+  "speakers": [
+    { "id": "atlas", "label": "atlas speakers", "host": "100.64.51.8", "port": 7713, "pan": 0.85 }
+  ]
+}
+```
+
+They appear in the menu bar's Microphone and Speaker menus (stored as
+`remote:<id>`). A remote mic streams raw 16 kHz mono s16 into the same
+push-to-talk and hands-free path as a local one; it connects when you press
+and closes after the warm-up period. A remote speaker gets HAL's lines and
+the cues as raw 22.05 kHz stereo s16, panned by `pan` (-1 left … 1 right):
+put HAL's voice in the speaker nearest the screen. The portal plays its own
+copy silently so the eye and the ceiling still move with HAL's voice.
+
+On a Linux machine with PipeWire, two user services serve them. Bind them to
+the machine's Tailscale address and accept only the Mac's:
+
+```ini
+# ~/.config/systemd/user/hal-mic.service
+[Unit]
+Description=HAL mic over Tailscale
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:7712,bind=<this-tailscale-ip>,reuseaddr,fork,range=<mac-tailscale-ip>/32 "EXEC:pw-record --raw --target <source-name> --rate 16000 --channels 1 --format s16 -"
+Restart=on-failure
+[Install]
+WantedBy=default.target
+
+# ~/.config/systemd/user/hal-speaker.service: the same, with
+ExecStart=/usr/bin/socat TCP-LISTEN:7713,bind=<this-tailscale-ip>,reuseaddr,fork,range=<mac-tailscale-ip>/32 "EXEC:pw-cat --playback --raw --format s16 --rate 22050 --channels 2 -"
+```
+
+`systemctl --user enable --now hal-mic hal-speaker`; `pw-record --list-targets`
+or `wpctl status` names the source. The streams are unencrypted inside
+Tailscale's WireGuard tunnel and only ever carry raw audio.
 
 ## The eye
 
