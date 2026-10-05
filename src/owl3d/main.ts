@@ -34,6 +34,7 @@ import { ModelInstance, modelLibrary } from './models';
 import { updateBlocks } from './plot';
 import { Desk, Hatch } from './station';
 import { clock, scene } from './stage';
+import { VoiceDock } from './voice/dock';
 import { Voice, type VoiceState } from './voice/voice';
 import { buildRoom, createDust, gridUniforms } from './world';
 
@@ -53,6 +54,8 @@ interface Owl3dHost {
   /** HAL's lines from the outbox, rendered to speech by the shell. */
   onSpeak?(callback: (line: SpokenLine) => void): void;
   spoken?(id: string): void;
+  /** Drop HAL's queued lines. */
+  stopSpeaking?(): void;
 }
 declare global {
   interface Window {
@@ -98,6 +101,27 @@ const updateDust = createDust();
 const hud = new Hud();
 const caption = new Caption();
 const voice = new Voice();
+const dock = new VoiceDock({
+  onToggle: () => updateSettings({ voice: !settings.voice }),
+  onStop: () => {
+    voice.interrupt();
+    host?.stopSpeaking?.();
+  },
+});
+dock.render(voice.state, voice.detail);
+
+// In stereo the pointer hides after a moment; any movement brings it back.
+let pointerTimer = 0;
+function wakePointer(): void {
+  document.body.classList.remove('pointer-idle');
+  window.clearTimeout(pointerTimer);
+  pointerTimer = window.setTimeout(
+    () => document.body.classList.add('pointer-idle'),
+    2500
+  );
+}
+window.addEventListener('mousemove', wakePointer);
+wakePointer();
 
 /* ----------------------------- settings ----------------------------- */
 
@@ -124,6 +148,7 @@ function applySettings(next: Partial<PortalSettings>): void {
   document.body.dataset.mode = settings.mode;
   hud.mesh.visible = settings.hud;
   hud.touch();
+  dock.layout(settings.mode, settings.squeeze);
   if (settings.voice && voice.state === 'off') void voice.start();
   if (!settings.voice && voice.state !== 'off') voice.stop();
 }
@@ -278,7 +303,7 @@ if (host) {
 /* ------------------------------- voice ------------------------------- */
 
 const VOICE_LABELS: Record<VoiceState, [string, number]> = {
-  off: ['', 0x8a97a3],
+  off: ['MIC OFF', 0x56616b],
   starting: ['MIC STARTING', 0x8a97a3],
   loading: ['MIC LOADING', 0xf2b84b],
   listening: ['MIC LISTENING', 0x62d995],
@@ -294,12 +319,20 @@ function voiceBot(): Bot | undefined {
   return bots.get(voiceAgent) ?? bots.values().next().value;
 }
 
+let lastVoiceLog = '';
 voice.onChange = () => {
   const [label, color] = VOICE_LABELS[voice.state];
+  const status = `${voice.state}${voice.detail ? ` · ${voice.detail}` : ''}`;
+  // Progress ticks are noisy; log state changes and the final detail.
+  if (voice.state !== 'loading' || !/%$/.test(voice.detail)) {
+    if (status !== lastVoiceLog) console.info(`[owl3d] voice ${status}`);
+    lastVoiceLog = status;
+  }
   hud.setVoice(
     label && voice.detail ? `${label} · ${voice.detail}` : label,
     color
   );
+  dock.render(voice.state, voice.detail);
 };
 
 voice.onHeard = text => {
@@ -432,6 +465,7 @@ function frame(time: number): void {
     bot.voiceLevel = !engaged ? 0 : talking ? voice.outLevel : voice.micLevel;
   }
   if (talking) caption.hold(0.8);
+  dock.level(talking ? voice.outLevel : voice.micLevel);
   caption.update(dt);
   updateDust(now, dt);
   worldModels.forEach(model => {
@@ -486,6 +520,9 @@ function frame(time: number): void {
     camera.focus = D + settings.convergence;
     camera.updateProjectionMatrix();
     stereo.eyeSep = EYE_SEPARATION * settings.depth;
+    // The eyes derive from the camera's world matrix, which only a mono
+    // render would otherwise refresh.
+    camera.updateMatrixWorld();
     stereo.update(camera);
     const [first, second] = settings.swapEyes
       ? [stereo.cameraR, stereo.cameraL]

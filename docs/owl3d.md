@@ -42,20 +42,32 @@ Without the shell, open `/owl3d.html` from `npm run dev`. Query parameters:
 
 ## The Owl3D Shift
 
-Turn on the monitor's **Native 3D** (SBS) mode. The portal renders the left
-eye into the left half of the signal and the right eye into the right half.
-The Shift stretches each half across the panel, so by default each half is
-rendered anamorphically at the full-panel aspect ("Anamorphic halves" in the
-tray). If depth looks inside out, toggle **Swap eyes**.
+The Shift's panel does not decode side-by-side input by itself. **Owl3D's
+app does the 3D**: its *Stereo 3D Playback* tracks your eyes with the Shift's
+USB camera and weaves the left and right images for the panel's lenses. To
+see HAL in 3D:
 
-Stereo mode covers the entire display, menu bar included, because the panel
-splits the whole signal. If the Shift is your main display, consider making
-another monitor the main one in System Settings → Displays.
+1. Install and open the Owl3D app (owl3d.com; Mac needs Apple Silicon).
+2. In the app: **Stereo 3D Playback → Side-by-side → Start**.
+3. Put the portal in stereo (`S`, `⌘⌥H`, or the menu bar icon).
 
-The world is scaled to the panel: the glass is 16 × 9 units at z = 0 and the
-viewer sits 18 units in front (a 24" panel at 60 cm), with a 6.4 cm eye
-separation. The room's front edges line up with the screen's edges, so nothing
-is clipped by the frame. Depth and convergence are adjustable.
+Without that app the Shift shows the side-by-side frame flat: two squeezed
+copies of the room.
+
+The portal renders the left eye into the left half of the frame and the right
+eye into the right half, full SBS at 1920 × 2160 per eye, which is the
+Shift's 3D resolution. Each half is rendered anamorphically at the
+full-panel aspect ("Anamorphic halves" in the menu). If depth looks inside
+out, toggle **Swap eyes**. In stereo the portal covers the display but is not
+forced on top, so Owl3D's woven output can sit over it; "Keep Stereo on Top"
+in the menu changes that.
+
+The world is scaled to the panel: the glass is 16 × 9 units at z = 0,
+matching the Shift's 339 × 200 mm panel, and the viewer sits about 55 cm in
+front (the Shift's range is 45–100 cm), with a 6.4 cm eye separation. Both
+are constants in `src/owl3d/config.ts`. The room's front edges line up with
+the screen's edges, so nothing is clipped by the frame. Depth and
+convergence are adjustable.
 
 | Key | Action |
 | --- | --- |
@@ -66,6 +78,8 @@ is clipped by the frame. Depth and convergence are adjustable.
 | `A` | Anamorphic halves on/off |
 | `H` | HUD on/off |
 | `D` | Play the demo shift |
+| `M` | Microphone on/off |
+| `⌘⌥M` | Microphone on/off from anywhere (shell only) |
 | `⌘⌥H` | Toggle stereo / window from anywhere (shell only) |
 
 The floating window renders in mono; Owl3D's live 2D→3D conversion can add
@@ -87,6 +101,37 @@ depth to it.
 Each live agent gets its own bot (up to four) with a colored identity band and
 its own build plot. HAL embodies the first agent and stays home when the last
 one leaves.
+
+## Talking to HAL
+
+The portal listens on the Mac's microphone and runs Whisper (base.en) on
+your machine: WebGPU on the Apple GPU, WebAssembly otherwise. Speech is
+detected by level against the room's noise floor; each sentence is
+transcribed when you pause. HAL turns to face you while you talk, and its eye
+follows your voice. The dock at the bottom left shows the microphone state
+and level, toggles listening, and stops HAL mid-sentence.
+
+The shell connects that to an agent session through two JSON-lines files in
+`~/.hal/voice` (or `HAL_VOICE_DIR`):
+
+- `inbox.jsonl` gets one line per thing you say;
+- each line appended to `outbox.jsonl` is rendered with macOS `say` (voice
+  `HAL_VOICE`, default Daniel; rate `HAL_VOICE_RATE`) and spoken by HAL, with
+  subtitles, while its eye moves with its own voice. The microphone is deaf
+  while HAL talks.
+
+`scripts/hal-voice.mjs` is the agent's side (`npm run hal-voice -- …`):
+
+```bash
+node scripts/hal-voice.mjs listen            # one line per sentence you say
+node scripts/hal-voice.mjs say "Hello, Dave." # HAL speaks
+node scripts/hal-voice.mjs say --agent claude:<session> "…"  # as that session's bot
+```
+
+An agent that can watch a command's output (for example a Claude Code
+monitor on `hal-voice listen`) hears you as you speak and answers with
+`hal-voice say`. Everything stays on the machine; Whisper's model downloads
+once and the shell keeps it in `~/.hal/models`.
 
 ## The eye
 
@@ -184,6 +229,8 @@ page, `window.owl3d` exposes `emit(event)`, `demo()`, `bots` and `models`.
 | `src/owl3d/world.ts` | Grid room shader, hatch cut-out, dust, floor pulses |
 | `src/owl3d/models.ts`, `manifest.ts` | Model loading, sockets, clips, hot reload |
 | `src/owl3d/events.ts` | Bridge, BroadcastChannel and window event intake |
+| `src/owl3d/voice/` | Microphone, voice activity detection, Whisper worker, HAL's voice, the dock |
+| `scripts/hal-voice.mjs` | Agent side of the voice link (`listen`, `say`) |
 | `electron/owl3d/` | The always-on shell |
 | `blender/` | The Blender kit script and `.blend` |
 | `scripts/claude-code-source.mjs` | Claude Code transcripts for the bridge |

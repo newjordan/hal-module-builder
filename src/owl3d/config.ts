@@ -2,14 +2,18 @@ import type { AgentStage, AgentState } from '../agent-system/types';
 
 /**
  * World scale. The screen plane is W × H units at z = 0 and the viewer sits D
- * units in front of it, roughly a 24" panel viewed from 60 cm (≈3.3 cm per
- * unit). The room is a box behind the glass whose front edges match the
+ * units in front of it, matching the Owl3D Shift's panel and viewing
+ * distance (≈2.1 cm per unit). The room is a box behind the glass whose front edges match the
  * screen edges, so nothing is clipped by the frame in stereo.
  */
 export const W = 16;
 export const H = 9;
-export const D = 18;
-export const EYE_SEPARATION = 1.93; // 6.4 cm interpupillary distance
+/** The Owl3D Shift: a 339 × 200 mm panel (EDID), viewed from 45–100 cm. */
+export const PANEL_WIDTH_CM = 33.9;
+export const VIEWING_CM = 55;
+export const D = (W * VIEWING_CM) / PANEL_WIDTH_CM;
+/** 6.4 cm between the eyes, in world units. */
+export const EYE_SEPARATION = (W * 6.4) / PANEL_WIDTH_CM;
 export const ROOM = { x: 8, floor: -4.5, ceil: 4.5, back: -26 } as const;
 export const BOUNDS = {
   x: 6.4,
@@ -71,7 +75,7 @@ export interface PortalSettings {
 
 export const DEFAULT_SETTINGS: PortalSettings = {
   mode: 'window',
-  depth: 0.7,
+  depth: 0.5,
   convergence: 0,
   swapEyes: false,
   squeeze: true,

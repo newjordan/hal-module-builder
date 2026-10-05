@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BACKGROUND, H, MAX_BOTS, ROOM, W } from './config';
+import { BACKGROUND, D, H, MAX_BOTS, ROOM, W } from './config';
 import { glowTexture } from './fx';
 import { rand, scene } from './stage';
 
@@ -119,7 +119,7 @@ const fragmentShader = /* glsl */ `
       col += vec3(0.32, 0.85, 0.87) * rim * (0.2 + uHatch.w);
     }
     col *= 1.0 - shadow * 0.85;
-    col = mix(col, uBg, smoothstep(24.0, 50.0, length(vWorld - cameraPosition)));
+    col = mix(col, uBg, smoothstep(${(D + 6).toFixed(1)}, ${(D + 32).toFixed(1)}, length(vWorld - cameraPosition)));
     gl_FragColor = vec4(col, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>

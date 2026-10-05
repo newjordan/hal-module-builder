@@ -18,9 +18,116 @@
         width: 100vw;
         height: 100vh;
       }
-      /* Full-screen stereo hides the pointer so it never splits across eyes. */
-      body[data-mode='sbs'] {
+      /* In stereo the pointer hides when idle; move the mouse to get it back. */
+      body[data-mode='sbs'].pointer-idle {
         cursor: none;
+      }
+      /* Voice dock (src/owl3d/voice/dock.ts); drawn once per eye in stereo. */
+      .voice-dock {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 14px 8px 8px;
+        border: 1px solid rgba(83, 216, 223, 0.35);
+        border-radius: 999px;
+        background: rgba(7, 9, 11, 0.78);
+        color: #eef1f3;
+        font: 500 14px -apple-system, 'SF Pro Text', Helvetica, sans-serif;
+        transform-origin: left bottom;
+        -webkit-app-region: no-drag;
+        user-select: none;
+        z-index: 10;
+      }
+      .voice-dock button {
+        -webkit-app-region: no-drag;
+        cursor: pointer;
+        font: inherit;
+      }
+      .voice-dock__mic {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: #1b1f25;
+        color: #8a97a3;
+      }
+      .voice-dock__mic svg {
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .voice-dock__mic[aria-pressed='true'] {
+        background: rgba(98, 217, 149, 0.16);
+        color: #62d995;
+        box-shadow: 0 0 0 2px rgba(98, 217, 149, 0.45);
+      }
+      .voice-dock[data-state='hearing'] .voice-dock__mic,
+      .voice-dock[data-state='transcribing'] .voice-dock__mic {
+        color: #53d8df;
+        box-shadow: 0 0 0 2px rgba(83, 216, 223, 0.7);
+      }
+      .voice-dock[data-state='speaking'] .voice-dock__mic {
+        color: #ff625f;
+        box-shadow: 0 0 0 2px rgba(255, 98, 95, 0.6);
+      }
+      .voice-dock[data-state='error'] .voice-dock__mic {
+        color: #ff625f;
+      }
+      .voice-dock__text {
+        display: grid;
+        min-width: 120px;
+      }
+      .voice-dock__label {
+        font-weight: 600;
+      }
+      .voice-dock__detail {
+        color: #8a97a3;
+        font-size: 12px;
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .voice-dock__detail:empty {
+        display: none;
+      }
+      .voice-dock__meter {
+        width: 72px;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+      }
+      .voice-dock__meter i {
+        display: block;
+        height: 100%;
+        background: #53d8df;
+        transform: scaleX(0);
+        transform-origin: left;
+      }
+      .voice-dock[data-state='speaking'] .voice-dock__meter i {
+        background: #ff625f;
+      }
+      .voice-dock__stop {
+        padding: 6px 12px;
+        border: 1px solid rgba(255, 98, 95, 0.6);
+        border-radius: 999px;
+        background: rgba(255, 98, 95, 0.12);
+        color: #ff625f;
+      }
+      .voice-dock kbd {
+        color: #56616b;
+        font: 500 12px 'SF Mono', Menlo, monospace;
       }
       /* The floating window has no frame; drag it anywhere. */
       body[data-mode='window'].in-shell {

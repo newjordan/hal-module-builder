@@ -25,6 +25,7 @@ const {
   globalShortcut,
   ipcMain,
   nativeImage,
+  net: electronNet,
   protocol,
   screen,
   shell,
@@ -34,19 +35,23 @@ const {
 const ROOT = path.resolve(__dirname, '..', '..');
 const DIST = path.join(ROOT, 'dist');
 const MODELS = path.join(ROOT, 'public', 'owl3d', 'models');
+// Hugging Face files (Whisper) fetched once through hal://app/hf/ and kept.
+const HF_CACHE = path.join(os.homedir(), '.hal', 'models');
 const DEV = process.argv.includes('--dev');
 const DEV_PORT = 5173;
 const BRIDGE_PORT = Number(process.env.HAL_BRIDGE_PORT || 8765);
 const DISPLAY_MATCH = /owl\s*3d|shift/i;
 const DEFAULTS = {
   mode: 'sbs',
-  depth: 0.7,
+  depth: 0.5,
   convergence: 0,
   swapEyes: false,
   squeeze: true,
   hud: true,
   displayId: null,
   voice: true,
+  // Off so Owl3D's Stereo 3D Playback can present its woven output on top.
+  stereoOnTop: false,
 };
 
 // Voice link (see scripts/hal-voice.mjs): what you say is appended to the
@@ -60,6 +65,8 @@ const VOICE_RATE = Number(process.env.HAL_VOICE_RATE || 172);
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.wasm': 'application/wasm',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
@@ -152,7 +159,7 @@ function placePortal() {
     // own every pixel of the display, menu bar included.
     portal.setBounds(bounds);
     portal.setSimpleFullScreen(true);
-    portal.setAlwaysOnTop(true, 'screen-saver');
+    portal.setAlwaysOnTop(Boolean(settings.stereoOnTop), 'screen-saver');
   } else {
     portal.setSimpleFullScreen(false);
     const width = Math.round(workArea.width * 0.42);
@@ -176,10 +183,32 @@ function inside(base, file) {
   return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
+/** Serve a Hugging Face hub file from the disk cache, fetching it once. */
+async function huggingFace(relative) {
+  const file = path.join(HF_CACHE, relative);
+  if (!inside(HF_CACHE, file)) return new Response('Forbidden', { status: 403 });
+  const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
+  if (!fs.existsSync(file)) {
+    const upstream = await electronNet.fetch(`https://huggingface.co/${relative}`);
+    if (!upstream.ok) return new Response(upstream.body, { status: upstream.status });
+    const data = Buffer.from(await upstream.arrayBuffer());
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(`${file}.part`, data);
+    fs.renameSync(`${file}.part`, file);
+  }
+  const data = fs.readFileSync(file);
+  return new Response(data, { headers: { 'content-type': type, 'content-length': String(data.length) } });
+}
+
 function serveDist() {
   protocol.handle('hal', request => {
     const { pathname } = new URL(request.url);
     const route = decodeURIComponent(pathname);
+    if (route.startsWith('/hf/')) {
+      return huggingFace(route.slice('/hf/'.length)).catch(
+        error => new Response(String(error.message || error), { status: 502 })
+      );
+    }
     // Models come straight from public/ so a Blender export shows up without
     // a rebuild; everything else is the built app.
     const fromModels = route.startsWith('/owl3d/models/');
@@ -277,6 +306,12 @@ function createPortal() {
   });
   portal.loadURL(`${baseUrl}owl3d.html`);
   portal.webContents.on('did-finish-load', sendSettings);
+  // Surface the portal's own status lines and any errors in this terminal.
+  portal.webContents.on('console-message', event => {
+    if (event.level === 'error' || event.level === 'warning' || /^\[owl3d\]/.test(event.message)) {
+      console.log(`[portal] ${event.message.slice(0, 400)}`);
+    }
+  });
   // Debug aid: OWL3D_SNAPSHOT=/path/to.png saves what the portal shows once
   // it has settled (OWL3D_SNAPSHOT_DELAY ms, default 12000), then quits.
   if (process.env.OWL3D_SNAPSHOT) {
@@ -357,6 +392,7 @@ function rebuildTray() {
       toggle('Swap eyes', 'swapEyes'),
       toggle('Anamorphic halves', 'squeeze'),
       toggle('Show HUD', 'hud'),
+      toggle('Keep Stereo on Top', 'stereoOnTop'),
       { ...toggle('Listen on Microphone', 'voice'), accelerator: 'Command+Alt+M' },
       {
         label: 'Depth',
@@ -530,6 +566,11 @@ ipcMain.on('owl3d:heard', (_event, text) => {
 
 ipcMain.on('owl3d:spoken', (_event, id) => {
   spokenWaiters.get(id)?.();
+});
+
+ipcMain.on('owl3d:stop-speaking', () => {
+  speechQueue.length = 0;
+  spokenWaiters.forEach(resolve => resolve());
 });
 
 /* ------------------------------- boot -------------------------------- */

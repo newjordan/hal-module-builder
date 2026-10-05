@@ -30,6 +30,9 @@ const scope = self as unknown as {
 };
 
 env.allowLocalModels = false;
+// In the Owl3D shell, fetch the model through its disk cache (hal://app/hf/).
+if (self.location.protocol === 'hal:')
+  env.remoteHost = `${self.location.origin}/hf/`;
 
 let transcriber: Transcriber | null = null;
 let loading: Promise<void> | null = null;

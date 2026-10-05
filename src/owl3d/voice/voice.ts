@@ -78,6 +78,8 @@ export class Voice {
   private wave = new Float32Array(1024);
   private deafUntil = 0;
   private speaking = 0;
+  private current: AudioBufferSourceNode | null = null;
+  private generation = 0;
   private queue: Promise<void> = Promise.resolve();
 
   /** Where to settle after hearing or speaking. */
@@ -234,9 +236,22 @@ export class Voice {
     });
   }
 
+  /** Stop HAL mid-sentence and drop anything queued behind it. */
+  interrupt(): void {
+    this.generation++;
+    try {
+      this.current?.stop();
+    } catch {
+      /* already stopped */
+    }
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+
   /** Play HAL's speech (WAV bytes); resolves when it has finished. */
   play(audio: ArrayBuffer): Promise<void> {
+    const generation = this.generation;
     const run = async () => {
+      if (generation !== this.generation) return;
       this.output ??= new AudioContext();
       const output = this.output;
       if (output.state === 'suspended') await output.resume();
@@ -249,6 +264,7 @@ export class Voice {
       const source = output.createBufferSource();
       source.buffer = buffer;
       source.connect(this.analyser);
+      this.current = source;
       this.speaking++;
       this.vad.reset();
       this.set('speaking');
@@ -257,6 +273,7 @@ export class Voice {
         source.start();
       });
       this.speaking--;
+      this.current = null;
       this.deafUntil = performance.now() + ECHO_TAIL_MS;
       if (this.state === 'speaking' && !this.speaking) this.set(this.resting());
     };

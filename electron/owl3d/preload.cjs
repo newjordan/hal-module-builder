@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld('halOwl3d', {
   heard: text => ipcRenderer.send('owl3d:heard', text),
   onSpeak: callback => ipcRenderer.on('owl3d:speak', (_event, line) => callback(line)),
   spoken: id => ipcRenderer.send('owl3d:spoken', id),
+  stopSpeaking: () => ipcRenderer.send('owl3d:stop-speaking'),
 });

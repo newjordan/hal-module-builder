@@ -106,7 +106,10 @@ rises through the floor to think and read, builds blocks with swiss-army arms
 for each tool call, types replies at a cyberdesk, and delivers finished work
 to it. The eye is your HAL Studio design mapped onto layered lens shells, the
 shapes come from a Blender kit you can sculpt, and the bridge now streams
-Claude Code sessions as well as Codex. See [docs/owl3d.md](docs/owl3d.md).
+Claude Code sessions as well as Codex. You can talk to it: Whisper runs on
+the Mac's microphone and HAL answers through the speakers, connected to an
+agent session through `scripts/hal-voice.mjs`. See
+[docs/owl3d.md](docs/owl3d.md).
 
 ## Quality commands
 

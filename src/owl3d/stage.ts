@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { BACKGROUND } from './config';
+import { BACKGROUND, D } from './config';
 
 /** Shared scene and clock for the Owl3D portal. */
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(BACKGROUND);
-scene.fog = new THREE.Fog(BACKGROUND, 26, 52);
+scene.fog = new THREE.Fog(BACKGROUND, D + 8, D + 34);
 
 export const clock = { now: 0 };
 
