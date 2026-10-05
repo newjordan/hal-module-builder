@@ -178,17 +178,53 @@ export function buildRoom(): void {
     new THREE.Euler(0, -Math.PI / 2, 0)
   );
 
-  // A thin frame where the room meets the glass anchors zero parallax.
-  const frame = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.PlaneGeometry(W - 0.02, H - 0.02)),
-    new THREE.LineBasicMaterial({
-      color: 0x3a7fb0,
+  buildVignette();
+}
+
+/**
+ * Dark corners. The Shift's 3D is weakest at the edges of the panel, so the
+ * room fades to black toward them and nothing bright or important lives
+ * there. Drawn at the glass (zero parallax), so both eyes agree.
+ */
+function buildVignette(): void {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext('2d');
+  if (!g) return;
+  // Normalized to the half-width; corners sit at √2. The plane is 16:9, so
+  // the circle stretches into an ellipse that hugs the panel's shape.
+  const reach = Math.SQRT2;
+  const gradient = g.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    (size / 2) * reach
+  );
+  gradient.addColorStop(0, 'rgba(0,0,0,0)');
+  gradient.addColorStop(0.6 / reach, 'rgba(0,0,0,0)');
+  gradient.addColorStop(0.92 / reach, 'rgba(0,0,0,0.55)');
+  gradient.addColorStop(1.15 / reach, 'rgba(0,0,0,0.88)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.97)');
+  g.fillStyle = gradient;
+  g.fillRect(0, 0, size, size);
+  const texture = new THREE.CanvasTexture(canvas);
+  const vignette = new THREE.Mesh(
+    new THREE.PlaneGeometry(W, H),
+    new THREE.MeshBasicMaterial({
+      map: texture,
       transparent: true,
-      opacity: 0.6,
+      depthTest: false,
+      depthWrite: false,
+      fog: false,
+      toneMapped: false,
     })
   );
-  frame.position.z = -0.01;
-  scene.add(frame);
+  vignette.position.z = 0.01;
+  vignette.renderOrder = 100;
+  scene.add(vignette);
 }
 
 let pulseIndex = 0;

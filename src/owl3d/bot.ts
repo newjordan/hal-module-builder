@@ -8,6 +8,8 @@ import type {
 import {
   BOUNDS,
   D,
+  H,
+  W,
   NAP_AFTER_SECONDS,
   ROOM,
   STAGES,
@@ -96,6 +98,31 @@ const ARM_MOUNTS = {
   R: new THREE.Vector3(0.8, -0.15, -0.05),
 };
 const CABLE_SOCKET = new THREE.Vector3(0, -0.86, -0.1);
+
+/** Center stage, just above the desk hologram: where HAL talks with you. */
+const CONVERSATION_SPOT = new THREE.Vector3(0, 0.5, -3.4);
+
+/**
+ * Keep a target out of the panel's corners and edges: its on-screen position
+ * must sit inside an ellipse inscribed in the glass. The Shift's 3D is
+ * weakest toward its edges, and corners are kept dark.
+ */
+export function keepFromCorners(
+  target: THREE.Vector3,
+  rx = 0.78,
+  ry = 0.74
+): THREE.Vector3 {
+  const k = D / Math.max(1, D - target.z);
+  const px = (target.x * k) / (W / 2);
+  const py = (target.y * k) / (H / 2);
+  const outside = (px / rx) ** 2 + (py / ry) ** 2;
+  if (outside > 1) {
+    const shrink = 1 / Math.sqrt(outside);
+    target.x *= shrink;
+    target.y *= shrink;
+  }
+  return target;
+}
 
 const dummy = new THREE.Object3D();
 const tmpA = new THREE.Vector3();
@@ -298,6 +325,11 @@ export class Bot {
       STATE_COLORS.idle,
       1.4
     );
+  }
+
+  /** What a pointer can touch to talk to (or hush) this bot. */
+  get pickable(): THREE.Object3D {
+    return this.group;
   }
 
   get position(): THREE.Vector3 {
@@ -852,31 +884,31 @@ export class Bot {
       }
 
       case 'speak': {
-        // Write the reply at the desk: hover behind it and type.
-        // Type on the left half so the holo screen on the right stays visible.
+        // Write the reply at the desk: hover beside the hologram and type,
+        // so the words above the desk stay clear.
         const side = this.slot % 2 === 0 ? -1 : 1;
-        this.target.set(DESK.x + side * 1.4, DESK.top + 1.7, DESK.z - 0.9);
+        this.target.set(DESK.x + side * 3.6, DESK.top + 1.0, DESK.z - 0.2);
         const typing = pos.distanceTo(this.target) < 1.2;
         // Writing a reply is talking to you: mostly face the viewer.
         this.lookAt.copy(
           Math.floor(since / 2.5) % 3 === 2
-            ? tmpA.set(DESK.x + side * 1.4, DESK.top, DESK.z + 0.55)
+            ? tmpA.set(DESK.x + side * 2.1, DESK.top, DESK.z + 0.1)
             : VIEWER
         );
         if (typing && arms) {
           const key = (offset: number) =>
             tmpA.set(
               DESK.x +
-                side * 1.4 +
+                side * 2.1 +
                 offset +
                 Math.sin(now * 9 + offset * 5) * 0.12,
               DESK.top +
                 0.08 +
                 Math.max(0, Math.sin(now * 14 + offset * 3)) * 0.1,
-              DESK.z + 0.55
+              DESK.z + 0.1
             );
-          arms.L.reach(key(-0.45), now + 0.3, 'pen');
-          arms.R.reach(key(0.45), now + 0.3, 'pen');
+          arms.L.reach(key(-0.25), now + 0.3, 'pen');
+          arms.R.reach(key(0.25), now + 0.3, 'pen');
         }
         energy = 0.75 + Math.random() * 0.25;
         bob = 0.05;
@@ -994,7 +1026,11 @@ export class Bot {
 
   update(now: number, dt: number): void {
     const { energy, speed, bob, roll } = this.behave(now);
-    if (this.facingViewer) this.lookAt.copy(VIEWER);
+    if (this.facingViewer) {
+      // In conversation: come to center stage above the hologram, face you.
+      this.lookAt.copy(VIEWER);
+      if (this.mode !== 'depart') this.target.copy(CONVERSATION_SPOT);
+    }
     const pos = this.position;
 
     if (this.mode !== 'depart' && this.mode !== 'emerge') {
@@ -1005,6 +1041,7 @@ export class Bot {
         BOUNDS.yMax
       );
       this.target.z = clamp(this.target.z, BOUNDS.zMin, BOUNDS.zMax);
+      keepFromCorners(this.target);
     }
     // Steer toward the target and arrive smoothly.
     const to = tmpA.subVectors(this.target, pos);

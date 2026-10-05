@@ -3,7 +3,8 @@ import { ROOM, STATE_COLORS } from './config';
 import { UI_FONT, glowSprite, textSurface } from './fx';
 import { ModelInstance } from './models';
 import { partInstance } from './rig';
-import { clamp, clock, damp, scene } from './stage';
+import { clamp, clock, cssColor, damp, scene } from './stage';
+import { captionPages } from './words';
 import { gridUniforms } from './world';
 
 /**
@@ -15,8 +16,11 @@ import { gridUniforms } from './world';
 /* ------------------------------- desk -------------------------------- */
 
 export const DESK = { x: 0, z: -1.8, top: ROOM.floor + 0.9 } as const;
-const SLOTS_X = [-2.2, -1.32, -0.44, 0.44, 1.32, 2.2];
+const SLOTS_X = [-1.32, -0.44, 0.44, 1.32];
 const SLOTS_Z = [-0.75, -0.1];
+/** Where the talk and stop buttons sit on the desk's front corners. */
+const BUTTON_X = 2.3;
+const BUTTON_Z = 0.5;
 
 interface DeskItem {
   object: THREE.Object3D;
@@ -26,40 +30,88 @@ interface DeskItem {
   sinking: number | null;
 }
 
+/** What the desk's voice controls should show. */
+export interface DeskVoice {
+  recording: boolean;
+  speaking: boolean;
+  /** 0..1 microphone level while recording. */
+  level: number;
+  /** The last recording had no sound at all. */
+  noMic: boolean;
+  /** Voice is loaded and ready for a press. */
+  ready: boolean;
+}
+
+const metal = () =>
+  new THREE.MeshStandardMaterial({
+    color: 0x1a1d22,
+    metalness: 0.85,
+    roughness: 0.3,
+  });
+
+/**
+ * The cyberdesk in the foreground. Everything you interact with is on it:
+ * a big red dome to hold while you talk to HAL, a stop block that lights up
+ * while HAL is speaking, a hologram projected from its emitter bar (status
+ * words and subtitles, a few huge words at a time), and the cartridges HAL
+ * delivers when a job is done.
+ */
 export class Desk {
+  readonly talkButton = new THREE.Group();
+  readonly stopButton = new THREE.Group();
   private readonly desk: ReturnType<typeof partInstance>;
-  private readonly screen: THREE.Mesh<
+  private readonly hologram: THREE.Mesh<
     THREE.PlaneGeometry,
     THREE.MeshBasicMaterial
   >;
-  private readonly surface = textSurface(1400, 560);
+  private readonly surface = textSurface(2048, 648);
+  private readonly talkCap: THREE.Mesh<
+    THREE.SphereGeometry,
+    THREE.MeshStandardMaterial
+  >;
+  private readonly talkRing: THREE.Mesh<
+    THREE.TorusGeometry,
+    THREE.MeshStandardMaterial
+  >;
+  private readonly talkGlow: THREE.Sprite;
+  private readonly stopCap: THREE.Mesh<
+    THREE.BoxGeometry,
+    THREE.MeshStandardMaterial
+  >;
   private readonly items: Array<DeskItem | null> = Array.from(
     { length: SLOTS_X.length * SLOTS_Z.length },
     () => null
   );
   private delivered = 0;
   private next = 0;
-  private dirty = true;
+  private pressed: 'talk' | 'stop' | null = null;
+  private voice: DeskVoice = {
+    recording: false,
+    speaking: false,
+    level: 0,
+    noMic: false,
+    ready: false,
+  };
+  private statusText: [string, string, number] = ['', '', 0];
+  private pages: string[][] = [];
+  private pageColor = 0xff625f;
+  private pageStart = 0;
+  private pageDuration = 0;
+  private pageUntil = 0;
+  private drawn = '';
 
   constructor() {
     this.desk = partInstance('desk', () => {
-      const slab = new THREE.Mesh(
-        new THREE.BoxGeometry(6, 0.12, 2.4),
-        new THREE.MeshStandardMaterial({
-          color: 0x15181d,
-          metalness: 0.8,
-          roughness: 0.3,
-        })
-      );
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(6, 0.12, 2.4), metal());
       slab.position.y = 0.84;
       return slab;
     });
     this.desk.object.position.set(DESK.x, ROOM.floor, DESK.z);
     scene.add(this.desk.object);
 
-    // Holo screen above the emitter bar at the back of the desk.
-    this.screen = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.4, 0.96),
+    // The hologram: projected up from the emitter bar, center stage.
+    this.hologram = new THREE.Mesh(
+      new THREE.PlaneGeometry(6, 1.9),
       new THREE.MeshBasicMaterial({
         map: this.surface.texture,
         transparent: true,
@@ -68,11 +120,74 @@ export class Desk {
         side: THREE.DoubleSide,
       })
     );
-    // On the desk's right wing, angled in, so the room behind stays clear.
-    this.screen.position.set(DESK.x + 2.1, DESK.top + 0.72, DESK.z - 0.75);
-    this.screen.rotation.set(-0.08, -0.38, 0);
-    this.screen.renderOrder = 12;
-    scene.add(this.screen);
+    this.hologram.position.set(DESK.x, DESK.top + 1.55, DESK.z - 1.05);
+    this.hologram.rotation.x = -0.08;
+    this.hologram.renderOrder = 12;
+    scene.add(this.hologram);
+
+    // Talk: a big red dome. Hold it to talk to HAL.
+    const talkBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.44, 0.5, 0.14, 48),
+      metal()
+    );
+    talkBase.position.y = 0.07;
+    this.talkRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.4, 0.035, 12, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x220504,
+        emissive: 0xff2a1a,
+        emissiveIntensity: 1,
+      })
+    );
+    this.talkRing.rotation.x = Math.PI / 2;
+    this.talkRing.position.y = 0.145;
+    this.talkCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.34, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshStandardMaterial({
+        color: 0x3a0806,
+        emissive: 0xff2a1a,
+        emissiveIntensity: 0.6,
+        roughness: 0.25,
+        metalness: 0.1,
+      })
+    );
+    this.talkCap.position.y = 0.14;
+    this.talkCap.scale.y = 0.75;
+    this.talkGlow = glowSprite(0xff2a1a, 1.6, 0.25);
+    this.talkGlow.position.y = 0.35;
+    this.talkButton.add(talkBase, this.talkRing, this.talkCap, this.talkGlow);
+    this.talkButton.position.set(
+      DESK.x - BUTTON_X,
+      DESK.top,
+      DESK.z + BUTTON_Z
+    );
+    this.talkButton.name = 'talk-button';
+    scene.add(this.talkButton);
+
+    // Stop: a square block that lights up while HAL is talking.
+    const stopBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.44, 0.5, 0.14, 48),
+      metal()
+    );
+    stopBase.position.y = 0.07;
+    this.stopCap = new THREE.Mesh(
+      new THREE.BoxGeometry(0.48, 0.16, 0.48),
+      new THREE.MeshStandardMaterial({
+        color: 0x15181c,
+        emissive: 0xeef1f3,
+        emissiveIntensity: 0.05,
+        roughness: 0.35,
+      })
+    );
+    this.stopCap.position.y = 0.2;
+    this.stopButton.add(stopBase, this.stopCap);
+    this.stopButton.position.set(
+      DESK.x + BUTTON_X,
+      DESK.top,
+      DESK.z + BUTTON_Z
+    );
+    this.stopButton.name = 'stop-button';
+    scene.add(this.stopButton);
   }
 
   /** World position of the next free slot (does not reserve it). */
@@ -110,7 +225,7 @@ export class Desk {
     };
   }
 
-  /** Set a carried cartridge down in the next slot and log it on the screen. */
+  /** Set a carried cartridge down in the next slot. */
   deliver(item: DeskItem): THREE.Vector3 {
     const index = this.next;
     const previous = this.items[index];
@@ -122,8 +237,96 @@ export class Desk {
     item.object.quaternion.identity();
     item.born = clock.now;
     this.delivered++;
-    this.dirty = true;
     return spot;
+  }
+
+  /* ----------------------------- controls ----------------------------- */
+
+  press(which: 'talk' | 'stop' | null): void {
+    this.pressed = which;
+  }
+
+  setVoice(voice: DeskVoice): void {
+    this.voice = voice;
+  }
+
+  /* ----------------------------- hologram ----------------------------- */
+
+  /** The hologram's resting content: what HAL is doing, in two words. */
+  status(word: string, action: string, color: number): void {
+    this.statusText = [word, action, color];
+  }
+
+  /** Subtitles: a few huge words at a time, paged while they are spoken. */
+  subtitle(text: string, color: number, seconds?: number): void {
+    this.pages = captionPages(text, 16, 2);
+    this.pageColor = color;
+    const words = text.split(/\s+/).length;
+    this.pageDuration = seconds ?? clamp(1.2 + words * 0.38, 2.5, 40);
+    this.pageStart = clock.now;
+    this.pageUntil = this.pageStart + this.pageDuration + 1.2;
+  }
+
+  /** Keep subtitles up while HAL is still talking. */
+  holdSubtitle(seconds: number): void {
+    this.pageUntil = Math.max(this.pageUntil, clock.now + seconds);
+  }
+
+  get subtitling(): boolean {
+    return clock.now < this.pageUntil && this.pages.length > 0;
+  }
+
+  private drawHologram(): void {
+    let key: string;
+    let lines: string[];
+    let color: number;
+    let size: number;
+    if (this.subtitling) {
+      const per = this.pageDuration / this.pages.length;
+      const index = Math.min(
+        this.pages.length - 1,
+        Math.floor((clock.now - this.pageStart) / Math.max(per, 1.4))
+      );
+      lines = this.pages[index] ?? [];
+      color = this.pageColor;
+      size = 230;
+      key = `sub|${index}|${lines.join('/')}|${color}`;
+    } else {
+      const [word, action, statusColor] = this.statusText;
+      lines = word
+        ? [word, action].filter(Boolean)
+        : this.delivered
+          ? [`✓ ${this.delivered}`]
+          : [];
+      color = word ? statusColor : 0x62d995;
+      size = 250;
+      key = `status|${lines.join('/')}|${color}`;
+    }
+    if (key === this.drawn) return;
+    this.drawn = key;
+    const { canvas, g, texture } = this.surface;
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    if (!lines.length) {
+      texture.needsUpdate = true;
+      return;
+    }
+    // Scanlines sell the hologram.
+    g.fillStyle = 'rgba(83,216,223,0.05)';
+    for (let y = 0; y < canvas.height; y += 8)
+      g.fillRect(0, y, canvas.width, 3);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `800 ${size}px ${UI_FONT}`;
+    const tint = cssColor(color);
+    lines.forEach((line, i) => {
+      const y = lines.length === 1 ? canvas.height / 2 : 170 + i * 300;
+      g.fillStyle = this.subtitling ? '#ffffff' : i === 0 ? tint : '#eef1f3';
+      g.fillText(line, canvas.width / 2, y, canvas.width - 80);
+    });
+    // Speaker or state color as a bar under the words.
+    g.fillStyle = tint;
+    g.fillRect(canvas.width * 0.3, canvas.height - 26, canvas.width * 0.4, 14);
+    texture.needsUpdate = true;
   }
 
   update(dt: number, glow: THREE.Color, energy: number): void {
@@ -144,42 +347,52 @@ export class Desk {
         }
       }
     }
-    this.drawScreen();
+
+    // Talk dome: sinks when pressed, swells and glows with your voice.
+    const { recording, speaking, level, noMic, ready } = this.voice;
+    const down = this.pressed === 'talk' || recording;
+    const pulse = recording ? 0.5 + 0.5 * Math.sin(clock.now * 8) : 0;
+    const capY = down ? 0.09 : 0.14;
+    this.talkCap.position.y += (capY - this.talkCap.position.y) * damp(18, dt);
+    const blink =
+      noMic && !recording ? (Math.sin(clock.now * 6) > 0 ? 1 : 0.2) : 1;
+    this.talkCap.material.emissive.set(
+      noMic && !recording ? 0xf2b84b : 0xff2a1a
+    );
+    this.talkCap.material.emissiveIntensity =
+      (ready || recording ? 0.6 : 0.15) + pulse * 0.6 + level * 2.5;
+    this.talkCap.material.emissiveIntensity *= blink;
+    this.talkRing.material.emissiveIntensity = recording
+      ? 2 + level * 3
+      : ready
+        ? 1
+        : 0.3;
+    this.talkGlow.material.opacity =
+      (recording ? 0.5 + level * 0.5 : ready ? 0.2 : 0.05) * blink;
+    this.talkGlow.scale.setScalar(1.4 + level * 1.4 + pulse * 0.3);
+
+    // Stop block: lit only while HAL talks.
+    const stopY = this.pressed === 'stop' ? 0.15 : 0.2;
+    this.stopCap.position.y += (stopY - this.stopCap.position.y) * damp(18, dt);
+    this.stopCap.material.emissiveIntensity +=
+      ((speaking ? 1.6 : 0.05) - this.stopCap.material.emissiveIntensity) *
+      damp(8, dt);
+
+    this.drawHologram();
   }
 
   dispose(): void {
     this.desk.model?.dispose();
     this.desk.object.removeFromParent();
-    this.screen.removeFromParent();
-    this.screen.material.dispose();
+    this.hologram.removeFromParent();
+    this.hologram.material.dispose();
     this.surface.texture.dispose();
+    this.talkButton.removeFromParent();
+    this.stopButton.removeFromParent();
     for (const item of this.items) {
       item?.model?.dispose();
       item?.object.removeFromParent();
     }
-  }
-
-  /** One huge glyph: a check and how many pieces of work were delivered. */
-  private drawScreen(): void {
-    if (!this.dirty) return;
-    this.dirty = false;
-    const { canvas, g, texture } = this.surface;
-    g.clearRect(0, 0, canvas.width, canvas.height);
-    g.fillStyle = 'rgba(83,216,223,0.07)';
-    g.fillRect(0, 0, canvas.width, canvas.height);
-    g.strokeStyle = 'rgba(83,216,223,0.7)';
-    g.lineWidth = 14;
-    g.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.font = `800 380px ${UI_FONT}`;
-    g.fillStyle = this.delivered ? '#62d995' : 'rgba(83,216,223,0.45)';
-    g.fillText(
-      this.delivered ? `✓ ${this.delivered}` : '✓',
-      canvas.width / 2,
-      canvas.height / 2 + 20
-    );
-    texture.needsUpdate = true;
   }
 }
 

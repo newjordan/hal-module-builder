@@ -104,24 +104,34 @@ Each live agent gets its own bot (up to four) with a colored identity band and
 its own build plot. HAL embodies the first agent and stays home when the last
 one leaves.
 
-## Text on the Shift
+## Everything lives in the room
 
-The Shift resolves big shapes, not small type, so the portal never shows
-small text: the HUD is one state word and one action word, bots float one
-word (RUN, EDIT, SEARCH, DONE…, see `src/owl3d/words.ts`), subtitles show a
-few huge words at a time, the desk screen is a big ✓ count, and the voice
-dock is a big ● record button, one word and a big ■ stop. Settings such as
-the microphone and hands-free listening live in the menu bar menu.
+Nothing is drawn on top of the 3D scene. The Shift's 3D is weakest toward
+its edges, so the corners stay dark (a vignette at the glass), HAL steers
+away from them, and every control and word is an object in the room:
+
+- **Talk:** the big red dome on the desk's left. Hold it (or HAL itself) to
+  talk; it sinks, pulses and glows with your voice, and blinks amber when the
+  microphone gives no sound.
+- **Stop:** the block on the desk's right lights up while HAL speaks; press
+  it (or HAL) to cut it off.
+- **Words:** a hologram projected from the desk shows what HAL is doing in two
+  huge words (WORKING · RUN) and, during conversation, subtitles a few huge
+  words at a time. HAL comes to center stage above it to talk with you.
+- Bots float one huge word per event (RUN, EDIT, SEARCH, DONE…).
+
+Presses are ray-cast into the scene (from the matching eye in stereo). The
+microphone choice and hands-free listening are in the menu bar menu.
 
 ## Talking to HAL
 
-Talking is **push-to-talk**: hold the red ● in the dock at the bottom left
-(or `.` in the portal, or press `⌘⌥.` anywhere to start and again to send),
+Talking is **push-to-talk**: hold the red dome on the desk (or HAL, or `.`
+in the portal, or press `⌘⌥.` anywhere to start and again to send),
 speak, and let go. The microphone only opens when you press, stays warm for
 15 seconds for a quick reply, then closes. The clip is transcribed with
 Whisper (base.en) on your machine: WebGPU on the Apple GPU, WebAssembly
-otherwise. Pressing while HAL talks cuts it off. HAL turns to face you while
-you talk, and its eye follows your voice.
+otherwise. Pressing while HAL talks cuts it off. HAL comes to center stage
+to face you while you talk, and its eye follows your voice.
 
 **Hands-free** (the dock toggle, `M` or `⌘⌥M`) keeps the microphone open
 instead; speech is detected by level against the room's noise floor and each

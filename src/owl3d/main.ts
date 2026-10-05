@@ -23,7 +23,6 @@ import { runDemo } from './demo';
 import { setEyeRenderer } from './eye';
 import { bridgeUrl, connectAgentEvents, type ConnectionLabel } from './events';
 import { particles } from './fx';
-import { Caption, Hud } from './hud';
 import {
   DESIGN_STORAGE_KEY,
   planEye,
@@ -34,9 +33,9 @@ import { ModelInstance, modelLibrary } from './models';
 import { updateBlocks } from './plot';
 import { Desk, Hatch } from './station';
 import { clock, scene } from './stage';
-import { VoiceDock } from './voice/dock';
 import { Voice, type VoiceState } from './voice/voice';
 import { buildRoom, createDust, gridUniforms } from './world';
+import { eventWord, stateWord } from './words';
 
 /* Host API from the Electron shell (electron/owl3d/preload.cjs). */
 interface SpokenLine {
@@ -102,9 +101,9 @@ buildRoom();
 // Built after models load so they use the Blender kit; see rebuildStation().
 const station: Station = { desk: new Desk(), hatch: new Hatch() };
 const updateDust = createDust();
-const hud = new Hud();
-const caption = new Caption();
 const voice = new Voice();
+/** The latest action word (RUN, EDIT…) for the desk hologram. */
+let lastAction = '';
 /**
  * Push-to-talk, shared by the ● button, the . key and ⌘⌥.: hold to talk and
  * release to send, or tap to start and tap again to send.
@@ -134,13 +133,67 @@ const pushToTalk = {
   },
 };
 
-const dock = new VoiceDock({
-  onRecordDown: () => pushToTalk.down(),
-  onRecordUp: () => pushToTalk.up(),
-  onStop: () => {
+/*
+ * Controls live in the room, not on top of it: hold the desk's red dome (or
+ * HAL itself) to talk; press the stop block (or HAL while it talks) to hush.
+ * Presses are ray-cast into the scene, from the matching eye in stereo.
+ */
+const raycaster = new THREE.Raycaster();
+const pointerNdc = new THREE.Vector2();
+let pressing: 'talk' | 'stop' | null = null;
+
+function pick(event: PointerEvent): 'talk' | 'stop' | 'hal' | null {
+  const rect = canvas.getBoundingClientRect();
+  let x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  let eye: THREE.PerspectiveCamera = camera;
+  if (settings.mode === 'sbs') {
+    const left = x < 0.5;
+    x = left ? x * 2 : (x - 0.5) * 2;
+    eye = left !== settings.swapEyes ? stereo.cameraL : stereo.cameraR;
+    eye.projectionMatrixInverse.copy(eye.projectionMatrix).invert();
+  }
+  pointerNdc.set(x * 2 - 1, 1 - y * 2);
+  raycaster.setFromCamera(pointerNdc, eye);
+  const partner = voiceBot();
+  const { talkButton, stopButton } = station.desk;
+  const targets: THREE.Object3D[] = [talkButton, stopButton];
+  if (partner) targets.push(partner.pickable);
+  for (
+    let o: THREE.Object3D | null =
+      raycaster.intersectObjects(targets, true)[0]?.object ?? null;
+    o;
+    o = o.parent
+  ) {
+    if (o === talkButton) return 'talk';
+    if (o === stopButton) return 'stop';
+    if (partner && o === partner.pickable) return 'hal';
+  }
+  return null;
+}
+
+canvas.addEventListener('pointerdown', event => {
+  const target = pick(event);
+  if (!target) return;
+  event.preventDefault();
+  if (target === 'stop' || (target === 'hal' && voice.state === 'speaking')) {
+    pressing = 'stop';
+    station.desk.press('stop');
     voice.interrupt();
     host?.stopSpeaking?.();
-  },
+    return;
+  }
+  pressing = 'talk';
+  station.desk.press('talk');
+  pushToTalk.down();
+});
+window.addEventListener('pointerup', () => {
+  if (pressing === 'talk') pushToTalk.up();
+  pressing = null;
+  station.desk.press(null);
+});
+canvas.addEventListener('pointermove', event => {
+  canvas.style.cursor = pick(event) ? 'pointer' : '';
 });
 
 /** List the microphones in the menu bar menu (labels need mic permission, granted once). */
@@ -162,7 +215,6 @@ navigator.mediaDevices?.addEventListener(
   'devicechange',
   () => void refreshInputs()
 );
-dock.render(voice.state, false);
 
 // In stereo the pointer hides after a moment; any movement brings it back.
 let pointerTimer = 0;
@@ -202,9 +254,6 @@ let settings = loadSettings();
 function applySettings(next: Partial<PortalSettings>): void {
   settings = { ...settings, ...next };
   document.body.dataset.mode = settings.mode;
-  hud.mesh.visible = settings.hud;
-  dock.layout(settings.mode, settings.squeeze);
-  dock.render(voice.state, Boolean(voice.warning));
   voice.setInput(settings.micLabel);
   void refreshInputs();
   if (settings.voice) void voice.enable(settings.handsFree);
@@ -304,7 +353,8 @@ function handleEvent(event: PortalEvent): void {
     return;
   }
   bot.apply(event);
-  hud.push(event, bot);
+  const word = event.replay ? null : eventWord(event);
+  if (word) lastAction = word;
 }
 
 let connection: ConnectionLabel = 'connecting';
@@ -367,18 +417,17 @@ voice.onChange = () => {
     lastVoiceLog = status;
   }
   if (voice.warning) console.warn(`[owl3d] ${voice.warning}`);
-  dock.render(voice.state, Boolean(voice.warning));
 };
 
 voice.onHeard = text => {
-  caption.show(text, 0x53d8df);
+  station.desk.subtitle(text, 0x53d8df);
   if (host?.heard) host.heard(text);
   else console.info('[owl3d] heard:', text);
 };
 
 host?.onSpeak?.(line => {
   if (line.agentId && bots.has(line.agentId)) voiceAgent = line.agentId;
-  caption.show(line.text, 0xff625f);
+  station.desk.subtitle(line.text, 0xff625f);
   const audio = line.audio.buffer.slice(
     line.audio.byteOffset,
     line.audio.byteOffset + line.audio.byteLength
@@ -515,9 +564,29 @@ function frame(time: number): void {
     bot.facingViewer = engaged;
     bot.voiceLevel = !engaged ? 0 : talking ? voice.outLevel : voice.micLevel;
   }
-  if (talking) caption.hold(0.8);
-  dock.level(talking ? voice.outLevel : voice.micLevel);
-  caption.update(dt);
+  if (talking) station.desk.holdSubtitle(0.8);
+  station.desk.setVoice({
+    recording: voice.state === 'recording',
+    speaking: talking,
+    level: voice.state === 'recording' ? voice.micLevel : 0,
+    noMic: Boolean(voice.warning),
+    ready:
+      voice.state !== 'off' &&
+      voice.state !== 'loading' &&
+      voice.state !== 'error',
+  });
+  // The hologram's resting words: what the agent in focus is doing.
+  const focus = partner ?? bots.values().next().value;
+  const resting =
+    !focus ||
+    !settings.hud ||
+    focus.state === 'idle' ||
+    focus.state === 'offline';
+  station.desk.status(
+    resting || !focus ? '' : stateWord(focus.state),
+    resting ? '' : lastAction,
+    focus ? STATE_COLORS[focus.state] : 0
+  );
   updateDust(now, dt);
   worldModels.forEach(model => {
     model.play('idle', 'world');
@@ -556,8 +625,6 @@ function frame(time: number): void {
       tile.z *= 0.9;
     }
   }
-
-  if (settings.hud) hud.draw([...bots.values()], dt, caption.showing);
 
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -615,7 +682,7 @@ const voiceHooks = {
   },
   /** Speak through the browser voice (no shell). */
   say(text: string): Promise<void> {
-    caption.show(text, 0xff625f);
+    station.desk.subtitle(text, 0xff625f);
     return voice.say(text);
   },
   get state(): VoiceState {

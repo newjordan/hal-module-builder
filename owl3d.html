@@ -23,97 +23,25 @@
       body[data-mode='full'].pointer-idle {
         cursor: none;
       }
-      /* Voice dock (src/owl3d/voice/dock.ts): chunky, for the 3D screen. */
-      .voice-dock {
-        --level: 0;
+      /* The floating window has no frame: drag it by an invisible top strip
+         (the rest of the window is the 3D room, where clicks land). */
+      .drag-strip {
+        display: none;
         position: fixed;
-        bottom: 28px;
-        left: 28px;
-        display: flex;
-        align-items: center;
-        gap: 22px;
-        padding: 12px 30px 12px 12px;
-        border-radius: 999px;
-        background: rgba(5, 7, 9, 0.72);
-        color: #ffffff;
-        font: 800 56px -apple-system, 'SF Pro Display', Helvetica, sans-serif;
-        letter-spacing: 0.02em;
-        transform-origin: left bottom;
-        -webkit-app-region: no-drag;
-        user-select: none;
-        z-index: 10;
-      }
-      .voice-dock button {
-        -webkit-app-region: no-drag;
-        cursor: pointer;
-        touch-action: none;
-      }
-      .voice-dock__record,
-      .voice-dock__stop {
-        position: relative;
-        width: 128px;
-        height: 128px;
-        padding: 0;
-        border: 6px solid rgba(255, 98, 95, 0.6);
-        border-radius: 50%;
-        background: #14181d;
-      }
-      /* The red dot; it swells and glows with your voice while recording. */
-      .voice-dock__record::after {
-        content: '';
-        position: absolute;
-        inset: 26px;
-        border-radius: 50%;
-        background: #ff3b30;
-        box-shadow: 0 0 calc(14px + var(--level) * 60px) rgba(255, 59, 48, 0.75);
-        transform: scale(calc(1 + var(--level) * 0.35));
-        transition: inset 120ms ease;
-      }
-      .voice-dock[data-state='recording'] .voice-dock__record {
-        border-color: #ff3b30;
-        box-shadow: 0 0 0 calc(8px + var(--level) * 26px) rgba(255, 59, 48, 0.28);
-      }
-      .voice-dock[data-state='recording'] .voice-dock__record::after {
-        inset: 18px;
-      }
-      .voice-dock[data-state='off'] .voice-dock__record::after,
-      .voice-dock[data-state='loading'] .voice-dock__record::after {
-        background: #5a2522;
-        box-shadow: none;
-      }
-      /* Stop: a big square, only while HAL talks. */
-      .voice-dock__stop {
-        border-color: rgba(238, 241, 243, 0.6);
-      }
-      .voice-dock__stop::after {
-        content: '';
-        position: absolute;
-        inset: 38px;
-        border-radius: 8px;
-        background: #eef1f3;
-      }
-      .voice-dock__word {
-        min-width: 2ch;
-      }
-      .voice-dock[data-state='recording'] .voice-dock__word,
-      .voice-dock.has-warning .voice-dock__word {
-        color: #ff3b30;
-      }
-      .voice-dock[data-state='speaking'] .voice-dock__word {
-        color: #ff625f;
-      }
-      .voice-dock[data-state='ready'] .voice-dock__word {
-        color: #62d995;
-      }
-      /* The floating window has no frame; drag it anywhere. */
-      body[data-mode='window'].in-shell {
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 36px;
         -webkit-app-region: drag;
-        border-radius: 14px;
+      }
+      body[data-mode='window'].in-shell .drag-strip {
+        display: block;
       }
     </style>
   </head>
   <body data-mode="window">
     <canvas id="owl3d-view"></canvas>
+    <div class="drag-strip"></div>
     <script>
       if (window.halOwl3d) document.body.classList.add('in-shell');
     </script>
