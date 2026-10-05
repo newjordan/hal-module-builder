@@ -5,18 +5,24 @@ import type { WorkerRequest, WorkerResponse } from './whisper.worker';
 /**
  * HAL's ears and mouth.
  *
- * Ears: the microphone at 16 kHz → an audio worklet tap → voice activity
- * detection → Whisper in a worker → `onHeard(text)`.
+ * Ears: push-to-talk by default. `beginRecording()` opens the microphone (16
+ * kHz, through an audio worklet tap) and collects everything until
+ * `endRecording()`, which hands the clip to Whisper in a worker and then to
+ * `onHeard(text)`. The mic stays warm for a short while after you finish so
+ * the next press is instant, then closes. Hands-free mode instead keeps the
+ * mic open and cuts utterances with voice activity detection.
+ *
  * Mouth: `play()` takes speech audio (the shell renders it with macOS `say`)
  * and plays it through the speakers with an analyser, so HAL's eye moves with
- * its own voice. The microphone is gated while HAL talks so it never hears
- * itself.
+ * its own voice. Hands-free listening is deaf while HAL talks; pressing to
+ * talk cuts HAL off.
  */
 
 export type VoiceState =
   | 'off'
-  | 'starting'
   | 'loading'
+  | 'ready'
+  | 'recording'
   | 'listening'
   | 'hearing'
   | 'transcribing'
@@ -24,8 +30,13 @@ export type VoiceState =
   | 'error';
 
 const MIC_RATE = 16_000;
-/** Mic stays deaf this long after HAL stops talking (room echo). */
+/** Hands-free listening stays deaf this long after HAL stops talking. */
 const ECHO_TAIL_MS = 600;
+/** Push-to-talk keeps the mic open this long after a recording ends. */
+const WARM_MIC_MS = 15_000;
+/** Shorter clips are taps, not speech. */
+const MIN_CLIP_SECONDS = 0.35;
+const MAX_CLIP_SECONDS = 60;
 
 // Batches the mic into 1024-sample blocks for the main thread.
 const TAP_SOURCE = `
@@ -54,6 +65,18 @@ interface Mic {
   node: AudioWorkletNode;
 }
 
+function concat(chunks: readonly Float32Array[]): Float32Array {
+  const out = new Float32Array(
+    chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  );
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
 export class Voice {
   state: VoiceState = 'off';
   /** What the HUD shows next to the state: model, progress or error. */
@@ -62,12 +85,18 @@ export class Voice {
   micLevel = 0;
   /** 0..1, HAL's voice while it speaks. */
   outLevel = 0;
+  handsFree = false;
   onChange: (() => void) | null = null;
   onHeard: ((text: string) => void) | null = null;
 
+  private enabled = false;
   private readonly vad = new VoiceActivityDetector();
   private mic: Mic | null = null;
-  private wanted = false;
+  private opening: Promise<Mic | null> | null = null;
+  private closeTimer = 0;
+  private recordingNow = false;
+  private chunks: Float32Array[] = [];
+  private recorded = 0;
   private worker: Worker | null = null;
   private ready: Promise<void> | null = null;
   private model = '';
@@ -82,9 +111,15 @@ export class Voice {
   private generation = 0;
   private queue: Promise<void> = Promise.resolve();
 
-  /** Where to settle after hearing or speaking. */
+  get recording(): boolean {
+    return this.recordingNow;
+  }
+
+  /** Where to settle when nothing is happening. */
   private resting(): VoiceState {
-    return this.mic ? (this.model ? 'listening' : 'loading') : 'off';
+    if (!this.enabled) return 'off';
+    if (!this.model) return 'loading';
+    return this.handsFree && this.mic ? 'listening' : 'ready';
   }
 
   private set(state: VoiceState, detail?: string): void {
@@ -92,6 +127,8 @@ export class Voice {
     if (detail !== undefined) this.detail = detail;
     this.onChange?.();
   }
+
+  /* ----------------------------- whisper ----------------------------- */
 
   /** Spin up Whisper (downloads on first use). */
   private whisper(): Promise<void> {
@@ -148,58 +185,96 @@ export class Voice {
     });
   }
 
-  async start(): Promise<void> {
-    this.wanted = true;
-    if (this.mic || this.state === 'starting') return;
-    this.set('starting', 'Opening the microphone');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      const context = new AudioContext({ sampleRate: MIC_RATE });
-      const url = URL.createObjectURL(
-        new Blob([TAP_SOURCE], { type: 'text/javascript' })
-      );
-      await context.audioWorklet.addModule(url);
-      URL.revokeObjectURL(url);
-      const node = new AudioWorkletNode(context, 'hal-mic-tap');
-      node.port.onmessage = ({ data }: MessageEvent<Float32Array>) =>
-        this.hear(data);
-      // Keep the tap in the rendered graph without echoing the room.
-      const mute = context.createGain();
-      mute.gain.value = 0;
-      context
-        .createMediaStreamSource(stream)
-        .connect(node)
-        .connect(mute)
-        .connect(context.destination);
-      if (!this.wanted) {
-        stream.getTracks().forEach(track => track.stop());
-        void context.close();
+  /* ------------------------------ enable ------------------------------ */
+
+  /** Voice on: load Whisper now so the first press is quick. */
+  async enable(handsFree: boolean): Promise<void> {
+    this.enabled = true;
+    this.handsFree = handsFree;
+    if (!this.model) {
+      if (this.state !== 'loading') this.set('loading', 'Loading Whisper');
+      try {
+        await this.whisper();
+      } catch (error) {
+        this.set(
+          'error',
+          error instanceof Error ? error.message : String(error)
+        );
         return;
       }
-      this.mic = { context, stream, node };
-      this.set('loading', 'Loading Whisper');
-      await this.whisper();
-      if (this.mic) this.set('listening', this.model);
-    } catch (error) {
-      this.release();
-      this.set('error', error instanceof Error ? error.message : String(error));
+    }
+    if (!this.enabled) return;
+    if (this.handsFree) {
+      await this.openMic();
+    } else if (!this.recordingNow) {
+      this.scheduleClose();
+    }
+    if (
+      !this.recordingNow &&
+      this.state !== 'transcribing' &&
+      this.state !== 'speaking'
+    ) {
+      this.set(this.resting(), this.model);
     }
   }
 
-  stop(): void {
-    this.wanted = false;
-    this.release();
+  disable(): void {
+    this.enabled = false;
+    this.recordingNow = false;
+    this.chunks = [];
+    this.closeMic();
     this.set('off', '');
   }
 
-  private release(): void {
+  /* ---------------------------- microphone ---------------------------- */
+
+  private openMic(): Promise<Mic | null> {
+    window.clearTimeout(this.closeTimer);
+    if (this.mic) return Promise.resolve(this.mic);
+    this.opening ??= (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        const context = new AudioContext({ sampleRate: MIC_RATE });
+        const url = URL.createObjectURL(
+          new Blob([TAP_SOURCE], { type: 'text/javascript' })
+        );
+        await context.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        const node = new AudioWorkletNode(context, 'hal-mic-tap');
+        node.port.onmessage = ({ data }: MessageEvent<Float32Array>) =>
+          this.hear(data);
+        // Keep the tap in the rendered graph without echoing the room.
+        const mute = context.createGain();
+        mute.gain.value = 0;
+        context
+          .createMediaStreamSource(stream)
+          .connect(node)
+          .connect(mute)
+          .connect(context.destination);
+        this.mic = { context, stream, node };
+        return this.mic;
+      } catch (error) {
+        this.set(
+          'error',
+          error instanceof Error ? error.message : String(error)
+        );
+        return null;
+      } finally {
+        this.opening = null;
+      }
+    })();
+    return this.opening;
+  }
+
+  private closeMic(): void {
+    window.clearTimeout(this.closeTimer);
     if (!this.mic) return;
     this.mic.stream.getTracks().forEach(track => track.stop());
     this.mic.node.port.onmessage = null;
@@ -207,15 +282,65 @@ export class Voice {
     this.mic = null;
     this.vad.reset();
     this.micLevel = 0;
+    if (this.state === 'listening' || this.state === 'hearing')
+      this.set(this.resting());
+  }
+
+  /** Push-to-talk: let the mic go after a quiet spell. */
+  private scheduleClose(): void {
+    window.clearTimeout(this.closeTimer);
+    if (this.handsFree || this.recordingNow) return;
+    this.closeTimer = window.setTimeout(() => this.closeMic(), WARM_MIC_MS);
+  }
+
+  /* ---------------------------- push to talk --------------------------- */
+
+  /** Start capturing what you say (cuts HAL off if it is talking). */
+  async beginRecording(): Promise<void> {
+    if (this.recordingNow) return;
+    if (this.speaking) this.interrupt();
+    this.recordingNow = true;
+    this.chunks = [];
+    this.recorded = 0;
+    this.set('recording');
+    if (!this.enabled) void this.enable(this.handsFree);
+    const mic = await this.openMic();
+    if (!mic) this.recordingNow = false;
+  }
+
+  /** Stop capturing and send the clip to Whisper. */
+  endRecording(): void {
+    if (!this.recordingNow) return;
+    this.recordingNow = false;
+    const audio = concat(this.chunks);
+    this.chunks = [];
+    this.recorded = 0;
+    this.scheduleClose();
+    if (audio.length < MIN_CLIP_SECONDS * MIC_RATE) {
+      this.set(this.resting());
+      return;
+    }
+    this.understand(audio);
   }
 
   private hear(samples: Float32Array): void {
+    if (this.recordingNow) {
+      this.chunks.push(samples);
+      this.recorded += samples.length;
+      let sum = 0;
+      for (let i = 0; i < samples.length; i++) sum += (samples[i] ?? 0) ** 2;
+      this.micLevel = Math.min(1, Math.sqrt(sum / samples.length) * 9);
+      if (this.recorded >= MAX_CLIP_SECONDS * MIC_RATE) this.endRecording();
+      return;
+    }
     if (
+      !this.handsFree ||
       this.speaking ||
       performance.now() < this.deafUntil ||
-      this.state === 'loading'
+      !this.model
     ) {
       this.vad.reset();
+      this.micLevel *= 0.8;
       return;
     }
     const utterances = this.vad.push(samples);
@@ -235,6 +360,8 @@ export class Voice {
       if (text) this.onHeard?.(text);
     });
   }
+
+  /* ------------------------------- mouth ------------------------------- */
 
   /** Stop HAL mid-sentence and drop anything queued behind it. */
   interrupt(): void {
@@ -261,13 +388,14 @@ export class Voice {
         this.analyser.connect(output.destination);
       }
       const buffer = await output.decodeAudioData(audio.slice(0));
+      if (generation !== this.generation) return;
       const source = output.createBufferSource();
       source.buffer = buffer;
       source.connect(this.analyser);
       this.current = source;
       this.speaking++;
       this.vad.reset();
-      this.set('speaking');
+      if (!this.recordingNow) this.set('speaking');
       await new Promise<void>(resolve => {
         source.onended = () => resolve();
         source.start();
@@ -291,7 +419,7 @@ export class Voice {
         utterance.onboundary = () => (this.outLevel = 0.9);
         utterance.onstart = () => {
           this.speaking++;
-          this.set('speaking');
+          if (!this.recordingNow) this.set('speaking');
         };
         utterance.onend = utterance.onerror = () => {
           this.speaking = Math.max(0, this.speaking - 1);
@@ -320,7 +448,7 @@ export class Voice {
     } else {
       this.outLevel *= 0.85;
     }
-    if (!this.mic) this.micLevel *= 0.85;
+    if (!this.recordingNow && !this.handsFree) this.micLevel *= 0.85;
   }
 
   /** Decode any audio file to 16 kHz mono (for tests and the debug hook). */

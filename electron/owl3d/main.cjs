@@ -50,6 +50,8 @@ const DEFAULTS = {
   hud: true,
   displayId: null,
   voice: true,
+  // Push-to-talk unless this is on.
+  handsFree: false,
   // Off so Owl3D's Stereo 3D Playback can present its woven output on top.
   stereoOnTop: false,
 };
@@ -183,20 +185,33 @@ function inside(base, file) {
   return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
-/** Serve a Hugging Face hub file from the disk cache, fetching it once. */
-async function huggingFace(relative) {
-  const file = path.join(HF_CACHE, relative);
+/**
+ * transformers.js file cache on disk: GET answers from ~/.hal/models (404 on
+ * a miss), PUT stores what was downloaded. Keys are Hugging Face hub URLs.
+ */
+async function huggingFaceCache(request) {
+  const key = new URL(request.url).searchParams.get('key') || '';
+  let hub;
+  try {
+    hub = new URL(key);
+  } catch {
+    return new Response('Bad key', { status: 400 });
+  }
+  if (hub.protocol !== 'https:' || !/^(huggingface\.co|hf\.co)$/.test(hub.hostname)) {
+    return new Response('Forbidden', { status: 403 });
+  }
+  const file = path.join(HF_CACHE, decodeURIComponent(hub.pathname));
   if (!inside(HF_CACHE, file)) return new Response('Forbidden', { status: 403 });
-  const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
-  if (!fs.existsSync(file)) {
-    const upstream = await electronNet.fetch(`https://huggingface.co/${relative}`);
-    if (!upstream.ok) return new Response(upstream.body, { status: upstream.status });
-    const data = Buffer.from(await upstream.arrayBuffer());
+  if (request.method === 'PUT') {
+    const data = Buffer.from(await request.arrayBuffer());
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(`${file}.part`, data);
     fs.renameSync(`${file}.part`, file);
+    return new Response(null, { status: 204 });
   }
+  if (!fs.existsSync(file)) return new Response('Not cached', { status: 404 });
   const data = fs.readFileSync(file);
+  const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
   return new Response(data, { headers: { 'content-type': type, 'content-length': String(data.length) } });
 }
 
@@ -204,10 +219,11 @@ function serveDist() {
   protocol.handle('hal', request => {
     const { pathname } = new URL(request.url);
     const route = decodeURIComponent(pathname);
-    if (route.startsWith('/hf/')) {
-      return huggingFace(route.slice('/hf/'.length)).catch(
-        error => new Response(String(error.message || error), { status: 502 })
-      );
+    if (route === '/hf-cache') {
+      return huggingFaceCache(request).catch(error => {
+        console.warn(`[owl3d] model cache: ${error.message || error}`);
+        return new Response(String(error.message || error), { status: 500 });
+      });
     }
     // Models come straight from public/ so a Blender export shows up without
     // a rebuild; everything else is the built app.
@@ -393,7 +409,9 @@ function rebuildTray() {
       toggle('Anamorphic halves', 'squeeze'),
       toggle('Show HUD', 'hud'),
       toggle('Keep Stereo on Top', 'stereoOnTop'),
-      { ...toggle('Listen on Microphone', 'voice'), accelerator: 'Command+Alt+M' },
+      { label: 'Talk to HAL (start / send)', accelerator: 'Command+Alt+.', click: pushToTalk },
+      toggle('Voice', 'voice'),
+      { ...toggle('Hands-free Listening', 'handsFree'), accelerator: 'Command+Alt+M' },
       {
         label: 'Depth',
         submenu: [0.3, 0.5, 0.7, 1, 1.3].map(depth => ({
@@ -426,6 +444,11 @@ function rebuildTray() {
 }
 
 /* ------------------------------- voice ------------------------------- */
+
+function pushToTalk() {
+  if (!settings.voice) update({ voice: true });
+  portal?.webContents.send('owl3d:push-to-talk');
+}
 
 async function ensureMicrophone() {
   if (process.platform !== 'darwin') return true;
@@ -487,6 +510,7 @@ async function pumpSpeech() {
   const line = speechQueue.shift();
   if (!line) return;
   speechBusy = true;
+  console.log(`[owl3d] say: ${line.text.slice(0, 60)}`);
   try {
     if (portal && !portal.isDestroyed()) {
       const audio = await synthesize(line.text);
@@ -603,7 +627,12 @@ app.whenReady().then(async () => {
   globalShortcut.register('CommandOrControl+Alt+H', () =>
     update({ mode: settings.mode === 'sbs' ? 'window' : 'sbs' })
   );
-  globalShortcut.register('CommandOrControl+Alt+M', () => update({ voice: !settings.voice }));
+  globalShortcut.register('CommandOrControl+Alt+M', () =>
+    update({ voice: true, handsFree: !settings.handsFree })
+  );
+  if (!globalShortcut.register('CommandOrControl+Alt+.', pushToTalk)) {
+    console.warn('[owl3d] ⌘⌥. is taken by another app; use the ● button or . in the portal');
+  }
   for (const change of ['display-added', 'display-removed', 'display-metrics-changed']) {
     screen.on(change, () => {
       placePortal();

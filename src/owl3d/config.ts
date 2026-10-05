@@ -69,8 +69,10 @@ export interface PortalSettings {
   /** Each half is stretched to full width by the panel (the Owl3D Shift does). */
   squeeze: boolean;
   hud: boolean;
-  /** Listen on the microphone (Whisper) and talk back. */
+  /** Voice on: talk to HAL (push-to-talk) and hear it answer. */
   voice: boolean;
+  /** Listen all the time instead of push-to-talk. */
+  handsFree: boolean;
 }
 
 export const DEFAULT_SETTINGS: PortalSettings = {
@@ -81,4 +83,5 @@ export const DEFAULT_SETTINGS: PortalSettings = {
   squeeze: true,
   hud: true,
   voice: false,
+  handsFree: false,
 };

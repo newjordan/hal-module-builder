@@ -30,9 +30,29 @@ const scope = self as unknown as {
 };
 
 env.allowLocalModels = false;
-// In the Owl3D shell, fetch the model through its disk cache (hal://app/hf/).
-if (self.location.protocol === 'hal:')
-  env.remoteHost = `${self.location.origin}/hf/`;
+// In the Owl3D shell, keep downloaded model files on disk (~/.hal/models)
+// through its hal://app/hf-cache endpoint, so Whisper loads offline and fast
+// after the first run. Downloads still come from the Hugging Face hub.
+if (self.location.protocol === 'hal:') {
+  const endpoint = (key: string) =>
+    `${self.location.origin}/hf-cache?key=${encodeURIComponent(key)}`;
+  env.useBrowserCache = false;
+  env.useCustomCache = true;
+  env.customCache = {
+    async match(key: string | Request) {
+      const url = typeof key === 'string' ? key : key.url;
+      const response = await fetch(endpoint(url));
+      return response.ok ? response : undefined;
+    },
+    async put(key: string | Request, response: Response) {
+      const url = typeof key === 'string' ? key : key.url;
+      await fetch(endpoint(url), {
+        method: 'PUT',
+        body: await response.arrayBuffer(),
+      });
+    },
+  };
+}
 
 let transcriber: Transcriber | null = null;
 let loading: Promise<void> | null = null;

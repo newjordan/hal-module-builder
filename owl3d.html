@@ -46,42 +46,60 @@
         cursor: pointer;
         font: inherit;
       }
-      .voice-dock__mic {
-        display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
+      /* The record button: a red dot. Hold to talk, or tap / tap. */
+      .voice-dock__record {
+        position: relative;
+        width: 46px;
+        height: 46px;
         padding: 0;
-        border: 0;
+        border: 2px solid rgba(255, 98, 95, 0.55);
         border-radius: 50%;
         background: #1b1f25;
+        touch-action: none;
+      }
+      .voice-dock__record::after {
+        content: '';
+        position: absolute;
+        inset: 12px;
+        border-radius: 50%;
+        background: #ff3b30;
+        box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+        transition: inset 120ms ease;
+      }
+      .voice-dock__record:hover::after {
+        inset: 10px;
+      }
+      .voice-dock[data-state='recording'] .voice-dock__record {
+        border-color: #ff3b30;
+        box-shadow: 0 0 0 6px rgba(255, 59, 48, 0.25);
+        animation: record-pulse 1s ease-in-out infinite;
+      }
+      .voice-dock[data-state='recording'] .voice-dock__record::after {
+        inset: 8px;
+        background: #ff5a4f;
+      }
+      .voice-dock[data-state='off'] .voice-dock__record::after,
+      .voice-dock[data-state='loading'] .voice-dock__record::after {
+        background: #5a2522;
+        box-shadow: none;
+      }
+      @keyframes record-pulse {
+        50% {
+          box-shadow: 0 0 0 10px rgba(255, 59, 48, 0.08);
+        }
+      }
+      .voice-dock__toggle {
+        padding: 6px 10px;
+        border: 1px solid #303840;
+        border-radius: 999px;
+        background: transparent;
         color: #8a97a3;
+        font-size: 12px;
       }
-      .voice-dock__mic svg {
-        width: 22px;
-        height: 22px;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-      }
-      .voice-dock__mic[aria-pressed='true'] {
-        background: rgba(98, 217, 149, 0.16);
+      .voice-dock__toggle[aria-pressed='true'] {
+        border-color: rgba(98, 217, 149, 0.6);
+        background: rgba(98, 217, 149, 0.12);
         color: #62d995;
-        box-shadow: 0 0 0 2px rgba(98, 217, 149, 0.45);
-      }
-      .voice-dock[data-state='hearing'] .voice-dock__mic,
-      .voice-dock[data-state='transcribing'] .voice-dock__mic {
-        color: #53d8df;
-        box-shadow: 0 0 0 2px rgba(83, 216, 223, 0.7);
-      }
-      .voice-dock[data-state='speaking'] .voice-dock__mic {
-        color: #ff625f;
-        box-shadow: 0 0 0 2px rgba(255, 98, 95, 0.6);
-      }
-      .voice-dock[data-state='error'] .voice-dock__mic {
-        color: #ff625f;
       }
       .voice-dock__text {
         display: grid;
@@ -115,7 +133,8 @@
         transform: scaleX(0);
         transform-origin: left;
       }
-      .voice-dock[data-state='speaking'] .voice-dock__meter i {
+      .voice-dock[data-state='speaking'] .voice-dock__meter i,
+      .voice-dock[data-state='recording'] .voice-dock__meter i {
         background: #ff625f;
       }
       .voice-dock__stop {

@@ -48,6 +48,8 @@ interface SpokenLine {
 interface Owl3dHost {
   onSettings(callback: (settings: Partial<PortalSettings>) => void): void;
   onDemo(callback: () => void): void;
+  /** ⌘⌥. from anywhere: start or send a recording. */
+  onPushToTalk?(callback: () => void): void;
   update(patch: Partial<PortalSettings>): void;
   /** What you said, for the connected agent session's inbox. */
   heard?(text: string): void;
@@ -101,14 +103,46 @@ const updateDust = createDust();
 const hud = new Hud();
 const caption = new Caption();
 const voice = new Voice();
+/**
+ * Push-to-talk, shared by the ● button, the . key and ⌘⌥.: hold to talk and
+ * release to send, or tap to start and tap again to send.
+ */
+const pushToTalk = {
+  pressedAt: 0,
+  down(): void {
+    if (voice.recording) {
+      voice.endRecording();
+      return;
+    }
+    this.pressedAt = performance.now();
+    host?.stopSpeaking?.();
+    void voice.beginRecording();
+  },
+  up(): void {
+    // A quick tap latches; a hold sends on release.
+    if (voice.recording && performance.now() - this.pressedAt > 300)
+      voice.endRecording();
+  },
+  toggle(): void {
+    if (voice.recording) voice.endRecording();
+    else {
+      host?.stopSpeaking?.();
+      void voice.beginRecording();
+    }
+  },
+};
+
 const dock = new VoiceDock({
-  onToggle: () => updateSettings({ voice: !settings.voice }),
+  onRecordDown: () => pushToTalk.down(),
+  onRecordUp: () => pushToTalk.up(),
+  onHandsFree: () =>
+    updateSettings({ voice: true, handsFree: !settings.handsFree }),
   onStop: () => {
     voice.interrupt();
     host?.stopSpeaking?.();
   },
 });
-dock.render(voice.state, voice.detail);
+dock.render(voice.state, voice.detail, false);
 
 // In stereo the pointer hides after a moment; any movement brings it back.
 let pointerTimer = 0;
@@ -149,8 +183,9 @@ function applySettings(next: Partial<PortalSettings>): void {
   hud.mesh.visible = settings.hud;
   hud.touch();
   dock.layout(settings.mode, settings.squeeze);
-  if (settings.voice && voice.state === 'off') void voice.start();
-  if (!settings.voice && voice.state !== 'off') voice.stop();
+  dock.render(voice.state, voice.detail, settings.handsFree);
+  if (settings.voice) void voice.enable(settings.handsFree);
+  else if (voice.state !== 'off') voice.disable();
 }
 
 function updateSettings(patch: Partial<PortalSettings>): void {
@@ -298,15 +333,17 @@ void modelLibrary.load().then(() => modelLibrary.watch());
 if (host) {
   host.onSettings(applySettings);
   host.onDemo(demo);
+  host.onPushToTalk?.(() => pushToTalk.toggle());
 }
 
 /* ------------------------------- voice ------------------------------- */
 
 const VOICE_LABELS: Record<VoiceState, [string, number]> = {
-  off: ['MIC OFF', 0x56616b],
-  starting: ['MIC STARTING', 0x8a97a3],
-  loading: ['MIC LOADING', 0xf2b84b],
-  listening: ['MIC LISTENING', 0x62d995],
+  off: ['VOICE OFF', 0x56616b],
+  loading: ['VOICE LOADING', 0xf2b84b],
+  ready: ['PUSH TO TALK · HOLD . OR ●', 0x62d995],
+  recording: ['● RECORDING', 0xff3b30],
+  listening: ['MIC LISTENING (HANDS-FREE)', 0x62d995],
   hearing: ['MIC HEARING YOU', 0x53d8df],
   transcribing: ['MIC TRANSCRIBING', 0x53d8df],
   speaking: ['HAL SPEAKING', 0xff625f],
@@ -328,11 +365,12 @@ voice.onChange = () => {
     if (status !== lastVoiceLog) console.info(`[owl3d] voice ${status}`);
     lastVoiceLog = status;
   }
+  const showDetail = voice.state === 'loading' || voice.state === 'error';
   hud.setVoice(
-    label && voice.detail ? `${label} · ${voice.detail}` : label,
+    showDetail && voice.detail ? `${label} · ${voice.detail}` : label,
     color
   );
-  dock.render(voice.state, voice.detail);
+  dock.render(voice.state, voice.detail, settings.handsFree);
 };
 
 voice.onHeard = text => {
@@ -350,7 +388,14 @@ host?.onSpeak?.(line => {
     line.audio.byteOffset,
     line.audio.byteOffset + line.audio.byteLength
   ) as ArrayBuffer;
-  void voice.play(audio).finally(() => host.spoken?.(line.id));
+  console.info(`[owl3d] speaking ${line.id} (${line.audio.byteLength} bytes)`);
+  void voice
+    .play(audio)
+    .catch(error => console.error('[owl3d] speech playback failed:', error))
+    .finally(() => {
+      console.info(`[owl3d] spoke ${line.id}`);
+      host.spoken?.(line.id);
+    });
 });
 
 window.addEventListener('keydown', event => {
@@ -380,17 +425,20 @@ window.addEventListener('keydown', event => {
         depth: Math.min(2, Math.round((settings.depth + 0.1) * 10) / 10),
       });
       break;
-    case ',':
+    case '-':
       updateSettings({ convergence: Math.max(-8, settings.convergence - 0.5) });
       break;
-    case '.':
+    case '=':
       updateSettings({ convergence: Math.min(8, settings.convergence + 0.5) });
+      break;
+    case '.':
+      if (!event.repeat) pushToTalk.down();
       break;
     case 'd':
       demo();
       break;
     case 'm':
-      updateSettings({ voice: !settings.voice });
+      updateSettings({ voice: true, handsFree: !settings.handsFree });
       break;
     case 'f':
       if (!host)
@@ -399,6 +447,10 @@ window.addEventListener('keydown', event => {
           : document.documentElement.requestFullscreen());
       break;
   }
+});
+
+window.addEventListener('keyup', event => {
+  if (event.key === '.') pushToTalk.up();
 });
 
 window.addEventListener('resize', () =>
@@ -457,7 +509,9 @@ function frame(time: number): void {
   voice.update();
   const talking = voice.state === 'speaking';
   const listeningToYou =
-    voice.state === 'hearing' || voice.state === 'transcribing';
+    voice.state === 'hearing' ||
+    voice.state === 'recording' ||
+    voice.state === 'transcribing';
   const partner = voiceBot();
   for (const bot of bots.values()) {
     const engaged = bot === partner && (talking || listeningToYou);

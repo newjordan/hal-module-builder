@@ -73,13 +73,14 @@ convergence are adjustable.
 | --- | --- |
 | `S` / `Esc` | Stereo full screen / floating window |
 | `[` `]` | Less / more depth |
-| `,` `.` | Push the zero-parallax plane in / out |
+| `-` `=` | Push the zero-parallax plane in / out |
 | `E` | Swap eyes |
 | `A` | Anamorphic halves on/off |
 | `H` | HUD on/off |
 | `D` | Play the demo shift |
-| `M` | Microphone on/off |
-| `⌘⌥M` | Microphone on/off from anywhere (shell only) |
+| `.` (hold) | Push to talk: hold, speak, release to send (tap to start, tap to send) |
+| `⌘⌥.` | Start / send a recording from anywhere (shell only) |
+| `M`, `⌘⌥M` | Hands-free listening on/off |
 | `⌘⌥H` | Toggle stereo / window from anywhere (shell only) |
 
 The floating window renders in mono; Owl3D's live 2D→3D conversion can add
@@ -104,12 +105,17 @@ one leaves.
 
 ## Talking to HAL
 
-The portal listens on the Mac's microphone and runs Whisper (base.en) on
-your machine: WebGPU on the Apple GPU, WebAssembly otherwise. Speech is
-detected by level against the room's noise floor; each sentence is
-transcribed when you pause. HAL turns to face you while you talk, and its eye
-follows your voice. The dock at the bottom left shows the microphone state
-and level, toggles listening, and stops HAL mid-sentence.
+Talking is **push-to-talk**: hold the red ● in the dock at the bottom left
+(or `.` in the portal, or press `⌘⌥.` anywhere to start and again to send),
+speak, and let go. The microphone only opens when you press, stays warm for
+15 seconds for a quick reply, then closes. The clip is transcribed with
+Whisper (base.en) on your machine: WebGPU on the Apple GPU, WebAssembly
+otherwise. Pressing while HAL talks cuts it off. HAL turns to face you while
+you talk, and its eye follows your voice.
+
+**Hands-free** (the dock toggle, `M` or `⌘⌥M`) keeps the microphone open
+instead; speech is detected by level against the room's noise floor and each
+sentence is sent when you pause. It is deaf while HAL talks.
 
 The shell connects that to an agent session through two JSON-lines files in
 `~/.hal/voice` (or `HAL_VOICE_DIR`):
