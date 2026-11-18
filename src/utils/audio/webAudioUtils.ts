@@ -9,10 +9,7 @@
  * Audio context state type
  */
 export type AudioContextState =
-  | 'suspended'
-  | 'running'
-  | 'closed'
-  | 'interrupted';
+  'suspended' | 'running' | 'closed' | 'interrupted';
 
 /**
  * Audio device change callback type
@@ -65,8 +62,9 @@ export const getMicrophoneStream = async (): Promise<MediaStream> => {
  */
 export const createAudioContext = async (): Promise<AudioContext> => {
   try {
-    const audioContext = new (window.AudioContext ||
-      (window as any).webkitAudioContext)();
+    const audioContext = new (
+      window.AudioContext || (window as any).webkitAudioContext
+    )();
 
     // Handle Chrome's autoplay policy - ensure context is resumed
     if (audioContext.state === 'suspended') {

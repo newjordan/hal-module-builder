@@ -8,12 +8,7 @@ export type AgentState =
   | 'offline';
 
 export type AgentStage =
-  | 'intake'
-  | 'context'
-  | 'reason'
-  | 'execute'
-  | 'verify'
-  | 'deliver';
+  'intake' | 'context' | 'reason' | 'execute' | 'verify' | 'deliver';
 
 export type EventKind =
   | 'thought'
@@ -25,11 +20,7 @@ export type EventKind =
   | 'system';
 
 export type EventSeverity =
-  | 'trace'
-  | 'info'
-  | 'success'
-  | 'warning'
-  | 'critical';
+  'trace' | 'info' | 'success' | 'warning' | 'critical';
 
 export type EventAction = 'acknowledge' | 'resolve' | 'retry' | 'approve';
 
@@ -37,11 +28,7 @@ export type EventFilter = 'all' | 'attention' | 'active' | 'completed';
 
 export type ConnectionState = 'demo' | 'connecting' | 'connected' | 'offline';
 export type ConnectionSource =
-  | 'demo'
-  | 'document'
-  | 'broadcast'
-  | 'window'
-  | 'websocket';
+  'demo' | 'document' | 'broadcast' | 'window' | 'websocket';
 
 export interface AgentMetrics {
   tokensUsed: number;
@@ -75,8 +62,9 @@ export interface Agent {
   lastSequence?: number;
 }
 
-export interface AgentRegistration
-  extends Partial<Omit<Agent, 'id' | 'name' | 'metrics'>> {
+export interface AgentRegistration extends Partial<
+  Omit<Agent, 'id' | 'name' | 'metrics'>
+> {
   id: string;
   name: string;
   metrics?: Partial<AgentMetrics>;
@@ -112,11 +100,10 @@ export interface AgentEvent {
   source: 'demo' | 'bridge' | 'websocket' | 'operator';
 }
 
-export interface AgentEventInput
-  extends Omit<
-    AgentEvent,
-    'id' | 'timestamp' | 'acknowledged' | 'resolved' | 'source'
-  > {
+export interface AgentEventInput extends Omit<
+  AgentEvent,
+  'id' | 'timestamp' | 'acknowledged' | 'resolved' | 'source'
+> {
   id?: string;
   timestamp?: number;
   acknowledged?: boolean;

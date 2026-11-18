@@ -176,10 +176,7 @@ export const EqualizerEngine: React.FC<EqualizerEngineProps> = ({
   }, [equalizerConfig, activeVisualizationType]);
 
   const radialOrientation = (typeSafeConfig as any).radialOrientation as
-    | 'follow-radius'
-    | 'follow-tangent'
-    | 'maintain'
-    | undefined;
+    'follow-radius' | 'follow-tangent' | 'maintain' | undefined;
 
   // Overscan to render unconstrained beyond the visible container (prevents clipping)
   const overscanFactor = 2; // 2x canvas size to allow drawing beyond container

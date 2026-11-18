@@ -127,8 +127,7 @@ function App() {
   // Load theme from localStorage on mount and initialize effects library
   useEffect(() => {
     const savedTheme = localStorage.getItem('hal-theme') as
-      | 'frost_light'
-      | 'frost_dark';
+      'frost_light' | 'frost_dark';
     if (savedTheme) {
       setTheme(savedTheme);
     }
