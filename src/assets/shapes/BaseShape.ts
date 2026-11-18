@@ -41,9 +41,9 @@ import {
  * }
  * ```
  */
-export abstract class BaseShape<T extends ShapeProperties = ShapeProperties>
-  implements IShape
-{
+export abstract class BaseShape<
+  T extends ShapeProperties = ShapeProperties,
+> implements IShape {
   /** Shape type identifier (must be implemented by subclasses) */
   abstract type: string;
   /** Shape metadata (must be implemented by subclasses) */

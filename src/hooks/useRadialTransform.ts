@@ -28,8 +28,7 @@ const resolveRadialConfig = ({
   };
 
   const rawDirection = (config as Record<string, unknown>).direction as
-    | RadialConfig['direction']
-    | undefined;
+    RadialConfig['direction'] | undefined;
   if (rawDirection) {
     resolved.direction = rawDirection;
   }

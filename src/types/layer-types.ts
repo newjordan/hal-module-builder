@@ -154,11 +154,7 @@ export interface LayerGradientOverlay {
 export interface LayerBevelEmboss {
   enabled: boolean;
   style:
-    | 'innerBevel'
-    | 'outerBevel'
-    | 'emboss'
-    | 'pillowEmboss'
-    | 'strokeEmboss';
+    'innerBevel' | 'outerBevel' | 'emboss' | 'pillowEmboss' | 'strokeEmboss';
   technique: 'smooth' | 'chiselSoft' | 'chiselHard';
   depth: number;
   direction: 'up' | 'down';

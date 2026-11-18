@@ -32,11 +32,7 @@ export type TextTruncationMode = 'ellipsis' | 'wrap' | 'none';
  * Text animation types for radial text sequences
  */
 export type RadialTextAnimationType =
-  | 'typewriter'
-  | 'spiral-in'
-  | 'fade-sequential'
-  | 'wave'
-  | 'none';
+  'typewriter' | 'spiral-in' | 'fade-sequential' | 'wave' | 'none';
 
 /**
  * Audio response mapping modes for reactive text

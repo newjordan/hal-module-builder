@@ -47,7 +47,7 @@ HAL Lens Studio.
 
 ## Run it
 
-Requires Node.js 18 or newer.
+Requires Node.js 20.19 or newer.
 
 ```bash
 npm install

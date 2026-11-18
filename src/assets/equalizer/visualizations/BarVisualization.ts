@@ -486,8 +486,7 @@ export class BarVisualization extends BaseVisualization {
     const endAngle = config.arcMode ? (config.endAngle ?? 360) : 360;
 
     const rawDirection = (config as Record<string, unknown>).direction as
-      | RadialConfig['direction']
-      | undefined;
+      RadialConfig['direction'] | undefined;
 
     const rawOuterRadius = (config as Record<string, unknown>).outerRadius;
 

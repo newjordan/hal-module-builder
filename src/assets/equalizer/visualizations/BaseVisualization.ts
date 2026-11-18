@@ -56,13 +56,7 @@ export interface VisualizationConfig {
   glowColor?: string;
   pulseMode: 'none' | 'subtle' | 'strong';
   symmetry?:
-    | 'none'
-    | 'mirror'
-    | 'rotate'
-    | '4-fold'
-    | '6-fold'
-    | '8-fold'
-    | '12-fold';
+    'none' | 'mirror' | 'rotate' | '4-fold' | '6-fold' | '8-fold' | '12-fold';
 
   // Transform
   rotation: number;
