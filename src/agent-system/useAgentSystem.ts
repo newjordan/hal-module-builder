@@ -6,6 +6,8 @@ import {
   MAX_EVENTS,
 } from './reducer';
 import { createInitialAgentSystemState } from './seed';
+import { publicUrl } from '../utils/publicUrl';
+import { detectAudioCapability } from '../utils/audio/audioCapability';
 import type {
   AgentCommand,
   AgentCommandAction,
@@ -345,7 +347,7 @@ export function useAgentSystem() {
       `${agent?.name || event.agentId}: ${event.title}`,
       {
         body: event.detail,
-        icon: '/hal_lens_1.png',
+        icon: publicUrl('hal_lens_1.png'),
         tag: event.id || `${event.agentId}-${event.kind}`,
         silent: stateRef.current.soundEnabled,
       }
@@ -677,18 +679,44 @@ export function useAgentSystem() {
     return enabled;
   }, [emit]);
 
-  const setSound = useCallback((enabled: boolean) => {
-    if (enabled) {
-      try {
-        const context = audioContext.current || new window.AudioContext();
-        audioContext.current = context;
-        if (context.state === 'suspended') void context.resume();
-      } catch {
-        return;
+  const setSound = useCallback(
+    (enabled: boolean) => {
+      if (enabled) {
+        const capability = detectAudioCapability();
+        if (!capability.webAudio) {
+          emit({
+            agentId: 'system',
+            kind: 'system',
+            severity: 'warning',
+            title: 'Alert tones unavailable',
+            detail:
+              capability.reason ??
+              'Web Audio is not available in this browser.',
+            source: 'operator',
+          });
+          return;
+        }
+        try {
+          const context = audioContext.current || new window.AudioContext();
+          audioContext.current = context;
+          if (context.state === 'suspended') void context.resume();
+        } catch {
+          emit({
+            agentId: 'system',
+            kind: 'system',
+            severity: 'warning',
+            title: 'Alert tones unavailable',
+            detail:
+              'Web Audio could not start. Visuals and events continue without tones.',
+            source: 'operator',
+          });
+          return;
+        }
       }
-    }
-    dispatch({ type: 'SET_SOUND', enabled });
-  }, []);
+      dispatch({ type: 'SET_SOUND', enabled });
+    },
+    [emit]
+  );
 
   const handleEvent = useCallback(
     (eventId: string, action: EventAction) => {

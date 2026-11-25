@@ -5,8 +5,8 @@ agent fleets. The agent console is the root application; the original visual
 layer composer is preserved at the `/studio` route as the internal HAL Lens
 Studio.
 
-Start with the top-level [README](../README.md) for what the console does and
-how to run it.
+Start with the top-level [README](../README.md) for the quick start, the lens
+studio, and the operations console.
 
 ## Current documentation
 
@@ -19,10 +19,9 @@ how to run it.
 
 ## Studio subsystem documentation
 
-These describe the visual layer composer now served at `/studio`. They predate
-the agent console and several are dated design analyses or refactoring plans;
-treat them as historical subsystem references, not descriptions of the root
-application.
+These describe the visual layer composer served at `/studio`. Several are dated
+design analyses or refactoring plans; use them as subsystem references, and
+use the root README for how to run the studio.
 
 - [`architecture/`](./architecture/) — studio-era system architecture,
   component, and type-system references plus epic analysis reports.

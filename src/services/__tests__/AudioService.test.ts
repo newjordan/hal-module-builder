@@ -112,4 +112,35 @@ describe('AudioService', () => {
     expect(source.stop).toHaveBeenCalled();
     expect(mockClose).toHaveBeenCalled();
   });
+
+  it('describes a working environment and rejects a missing microphone', async () => {
+    expect(AudioService.getAvailability().microphone).toBe(true);
+
+    const devices = navigator.mediaDevices;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: undefined,
+    });
+
+    await expect(AudioService.startVisualizer(() => {})).rejects.toThrow(
+      /Microphone capture is not available/
+    );
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: devices,
+    });
+  });
+
+  it('rejects playback when Web Audio cannot be constructed', async () => {
+    const Original = globalThis.AudioContext;
+    // @ts-expect-error removing the test double
+    delete globalThis.AudioContext;
+
+    await expect(
+      AudioService.playAudio(new ArrayBuffer(4), 'missing-audio')
+    ).rejects.toThrow(/Web Audio API is not available/);
+
+    globalThis.AudioContext = Original;
+  });
 });

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand
+
+      - name: Test the agent bridge
+        run: npm run test:bridge
+
+      - name: Build the static demo
+        run: npm run build
+
+      - name: Upload demo build
+        uses: actions/upload-artifact@v4
+        with:
+          name: hal-lens-studio-demo
+          path: dist
+          if-no-files-found: error
+          retention-days: 7

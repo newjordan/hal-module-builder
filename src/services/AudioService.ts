@@ -6,16 +6,42 @@
  * It is designed to be the central point for all audio operations in the application.
  */
 
+import { detectAudioCapability } from '../utils/audio/audioCapability';
+
 let audioContext: AudioContext | null = null;
 const activeSources = new Map<string, AudioBufferSourceNode>();
+
+function audioContextConstructor(): typeof AudioContext | undefined {
+  return (
+    globalThis.AudioContext ??
+    (globalThis as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext
+  );
+}
 
 /**
  * Returns the global AudioContext, creating it if it doesn't exist.
  * @returns The global AudioContext instance.
+ * @throws Error when Web Audio cannot be constructed. Callers should catch this
+ * and keep the visual design running.
  */
 function getAudioContext(): AudioContext {
   if (!audioContext || audioContext.state === 'closed') {
-    audioContext = new AudioContext();
+    const AudioContextCtor = audioContextConstructor();
+    if (!AudioContextCtor) {
+      throw new Error(
+        'Web Audio API is not available in this browser. The design still renders without live audio.'
+      );
+    }
+    try {
+      audioContext = new AudioContextCtor();
+    } catch (error) {
+      audioContext = null;
+      const detail = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Web Audio API is not available: ${detail}. The design still renders without live audio.`
+      );
+    }
   }
   return audioContext;
 }
@@ -80,10 +106,13 @@ let visualizerAnalyser: AnalyserNode | null = null;
 async function startVisualizer(
   onDataCallback: (data: number[]) => void
 ): Promise<void> {
-  const context = getAudioContext();
-  if (!navigator.mediaDevices.getUserMedia) {
-    throw new Error('getUserMedia not supported on your browser!');
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error(
+      'Microphone capture is not available in this browser. The design still renders without live audio.'
+    );
   }
+
+  const context = getAudioContext();
 
   visualizerStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const source = context.createMediaStreamSource(visualizerStream);
@@ -145,14 +174,31 @@ export const AudioService = {
   stopVisualizer,
 
   /**
+   * Reports whether microphone-reactive visuals can start in this browser.
+   */
+  getAvailability: () => detectAudioCapability(),
+
+  /**
    * Disposes of the entire audio service, closing the context.
    */
   dispose: (): void => {
     stopVisualizer();
-    activeSources.forEach(source => source.stop());
+    activeSources.forEach(source => {
+      try {
+        source.stop();
+      } catch {
+        // The source may already have stopped.
+      }
+    });
     activeSources.clear();
     if (audioContext && audioContext.state !== 'closed') {
-      audioContext.close();
+      try {
+        void Promise.resolve(audioContext.close()).catch(() => {
+          // Closing a context that the browser already tore down is not fatal.
+        });
+      } catch {
+        // Ignore synchronous close failures so unmount stays safe.
+      }
     }
     audioContext = null;
   },

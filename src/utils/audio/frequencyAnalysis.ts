@@ -209,6 +209,8 @@ export const detectOnset = (
  * @returns RMS energy (0.0-1.0)
  */
 export const calculateRMSEnergy = (frequencyData: Uint8Array): number => {
+  if (frequencyData.length === 0) return 0;
+
   let sumSquares = 0;
 
   for (let i = 0; i < frequencyData.length; i++) {

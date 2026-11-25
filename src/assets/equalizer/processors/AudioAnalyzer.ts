@@ -72,8 +72,18 @@ export class AudioAnalyzer {
     }
 
     try {
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      if (!AudioContextCtor) {
+        throw new Error(
+          'Web Audio API is not available in this browser. The design still renders without live audio.'
+        );
+      }
+
       // Create AudioContext with optimal settings
-      this.audioContext = new AudioContext({
+      this.audioContext = new AudioContextCtor({
         sampleRate: this.config.sampleRate,
         latencyHint: 'interactive', // Minimize latency for real-time processing
       });
@@ -102,6 +112,12 @@ export class AudioAnalyzer {
   async connectMicrophone(inputConfig: AudioInputConfig = {}): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error(
+        'Microphone capture is not available in this browser. The design still renders without live audio.'
+      );
     }
 
     try {

@@ -5,6 +5,8 @@
  * for microphone access, audio context management, and device handling.
  */
 
+import { detectAudioCapability } from './audioCapability';
+
 /**
  * Audio context state type
  */
@@ -22,6 +24,12 @@ export type AudioDeviceChangeCallback = () => void;
  * @throws Error if microphone access is denied or unavailable
  */
 export const getMicrophoneStream = async (): Promise<MediaStream> => {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error(
+      'Microphone capture is not available in this browser. The design still renders without live audio.'
+    );
+  }
+
   try {
     return await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -61,10 +69,16 @@ export const getMicrophoneStream = async (): Promise<MediaStream> => {
  * @throws Error if AudioContext creation fails
  */
 export const createAudioContext = async (): Promise<AudioContext> => {
+  const AudioContextCtor =
+    window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextCtor) {
+    throw new Error(
+      'Web Audio API is not available in this browser. The design still renders without live audio.'
+    );
+  }
+
   try {
-    const audioContext = new (
-      window.AudioContext || (window as any).webkitAudioContext
-    )();
+    const audioContext = new AudioContextCtor();
 
     // Handle Chrome's autoplay policy - ensure context is resumed
     if (audioContext.state === 'suspended') {
@@ -188,7 +202,7 @@ export const handleAudioDeviceChange = (
  * @returns True if Web Audio API is supported
  */
 export const isWebAudioSupported = (): boolean => {
-  return !!(window.AudioContext || (window as any).webkitAudioContext);
+  return detectAudioCapability().webAudio;
 };
 
 /**
@@ -196,7 +210,7 @@ export const isWebAudioSupported = (): boolean => {
  * @returns True if getUserMedia is supported
  */
 export const isGetUserMediaSupported = (): boolean => {
-  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  return detectAudioCapability().microphone;
 };
 
 /**

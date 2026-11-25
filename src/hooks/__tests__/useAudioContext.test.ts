@@ -30,6 +30,7 @@ const mockAudioContext = {
 // Mock navigator.mediaDevices
 Object.defineProperty(navigator, 'mediaDevices', {
   writable: true,
+  configurable: true,
   value: {
     getUserMedia: jest.fn().mockResolvedValue({
       getTracks: () => [{ stop: jest.fn() }],
@@ -199,5 +200,29 @@ describe('useAudioContext', () => {
     // Restore
     (global as any).AudioContext = originalAudioContext;
     (global as any).webkitAudioContext = originalWebkitAudioContext;
+  });
+
+  it('stays inactive and explains a missing microphone', async () => {
+    const devices = navigator.mediaDevices;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: undefined,
+    });
+
+    const { result } = renderHook(() => useAudioContext(mockLayers));
+    expect(result.current.isSupported).toBe(false);
+    expect(result.current.unavailableReason).toMatch(/Microphone capture/);
+
+    await act(async () => {
+      await result.current.startAudio();
+    });
+
+    expect(result.current.isActive).toBe(false);
+    expect(result.current.audioData.every(value => value === 0)).toBe(true);
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: devices,
+    });
   });
 });

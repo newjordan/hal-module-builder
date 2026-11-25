@@ -20,6 +20,7 @@ interface DesignModeProps {
 }
 
 import { DEFAULT_HAL_LAYERS } from '../../config/defaultHalDesign';
+import { liveAudioButtonLabel } from '../../utils/audio/audioCapability';
 
 // Default starting design for new sessions — the signature HAL eye
 const DEFAULT_LAYERS: Layer[] = DEFAULT_HAL_LAYERS;
@@ -95,9 +96,15 @@ export function DesignMode({ className = '' }: DesignModeProps) {
   } = useTemplates();
 
   // Audio context for visualizations
-  const { audioData, isActive, toggleAudio } = useAudioContext(layers, {
-    fftSize: 128,
-  });
+  const { audioData, isActive, toggleAudio, isSupported, unavailableReason } =
+    useAudioContext(layers, {
+      fftSize: 128,
+    });
+
+  const handleAudioToggle = React.useCallback(() => {
+    if (!isSupported) return;
+    void toggleAudio();
+  }, [isSupported, toggleAudio]);
 
   // Selected layer for properties panel
   const selectedLayer = useMemo(
@@ -271,7 +278,16 @@ export function DesignMode({ className = '' }: DesignModeProps) {
 
               {/* Center: Audio toggle */}
               <button
-                onClick={toggleAudio}
+                type='button'
+                onClick={handleAudioToggle}
+                disabled={!isSupported}
+                aria-pressed={isActive}
+                title={
+                  unavailableReason ??
+                  (isActive
+                    ? 'Stop microphone input'
+                    : 'Drive the design from the microphone')
+                }
                 style={{
                   padding: '6px 16px',
                   background: isActive
@@ -279,14 +295,18 @@ export function DesignMode({ className = '' }: DesignModeProps) {
                     : 'rgba(255, 255, 255, 0.1)',
                   border: `1px solid ${isActive ? 'rgba(100, 200, 100, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
                   borderRadius: 6,
-                  color: isActive ? '#90EE90' : 'rgba(255, 255, 255, 0.7)',
-                  cursor: 'pointer',
+                  color: !isSupported
+                    ? 'rgba(255, 196, 120, 0.9)'
+                    : isActive
+                      ? '#90EE90'
+                      : 'rgba(255, 255, 255, 0.7)',
+                  cursor: isSupported ? 'pointer' : 'not-allowed',
                   fontSize: 13,
                   fontWeight: 500,
                   transition: 'all 0.2s ease',
                 }}
               >
-                {isActive ? '🎵 Audio Active' : '🔇 Enable Audio'}
+                {liveAudioButtonLabel(isSupported, isActive)}
               </button>
 
               {/* Right: spacer */}
@@ -321,7 +341,7 @@ export function DesignMode({ className = '' }: DesignModeProps) {
                   isActive={isActive}
                   size={500}
                   theme='frost_dark'
-                  onClick={toggleAudio}
+                  onClick={handleAudioToggle}
                   onUpdateLayer={updateLayer}
                 />
               </Suspense>
@@ -342,6 +362,9 @@ export function DesignMode({ className = '' }: DesignModeProps) {
             >
               <span>
                 {layers.length} layer{layers.length !== 1 ? 's' : ''}
+              </span>
+              <span role='status' style={{ textAlign: 'center' }}>
+                {unavailableReason ?? ''}
               </span>
               <span>
                 {selectedLayer
