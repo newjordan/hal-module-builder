@@ -1,85 +1,86 @@
 <div align="center">
 
-<img src="public/hal_lens_1.png" alt="HAL Agent Operations" width="160" />
+<img src="public/hal_lens_1.png" alt="HAL lens" width="160" />
 
-# HAL Agent Operations
+# HAL Lens Studio
 
-**A live notification, telemetry, and control surface for agent fleets.**
+**A browser-based audio-reactive visual design tool.**
 
-HAL turns agent lifecycle events into an operational display where every visual
-signal has a job: thinking, tool execution, waiting, completion, failure,
-progress, queue pressure, context use, and operator attention each have a
-distinct color, motion, icon, and trace.
+Compose layered lens designs, drive them from the microphone, and present them full screen. The same app also includes the HAL agent operations console.
 
 </div>
 
-## What it does
+## Quick start
 
-- **Visual agent identity** - stable callsigns and identity marks make agents
-  recognizable independently of status color.
-- **Semantic HAL lens** - the selected agent's center instrument maps reasoning,
-  execution, determinate progress, context pressure, and heartbeat state to
-  separate rings and motion patterns.
-- **Observable cognition stream** - safe producer-supplied summaries, tool calls,
-  messages, and system events appear in a bounded live log. HAL never invents or
-  exposes hidden chain-of-thought.
-- **Attention queue** - approvals, failures, completions, and sustained warning
-  signals support acknowledge, resolve, approve, and retry workflows.
-- **Fleet trace** - a synchronized five-minute timeline shows thought, tool,
-  approval, completion, and error events across every registered agent.
-- **Real feedback channels** - optional alert tones and desktop notifications;
-  outbound operator commands publish through `CustomEvent`, `BroadcastChannel`,
-  and an attached WebSocket.
-- **Multiple event sources** - a deterministic local simulation works out of the
-  box, while page events, same-origin tabs/workers, and a WebSocket bridge can
-  stream real events.
-- **Live Codex sidecar** - the included localhost-only bridge tails current
-  workspace sessions, emits safe lifecycle/tool/token telemetry, redacts visible
-  commentary, and never forwards prompts, reasoning ciphertext, tool arguments,
-  or raw tool output.
-- **Persistent operations state** - acknowledgements, filters, selected agent,
-  retained events, and preferences survive reloads in local storage.
-- **Responsive operations layout** - dense desktop, compact laptop, and mobile
-  arrangements preserve the primary lens and keep the attention queue reachable.
-
-The original visual layer composer is preserved at `/studio` as the internal
-HAL Lens Studio.
-
-## Run it
-
-Requires Node.js 20.19 or newer.
+Requires Node.js `^20.19.0` or `>=22.12.0`.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The console starts in clearly labeled simulation
-mode and can be paused from the top bar.
+| Surface | URL |
+| --- | --- |
+| Lens Studio | http://localhost:5173/studio |
+| Agent operations | http://localhost:5173/ |
 
-For real Codex session telemetry, start the sidecar and frontend together:
+The studio opens on the default HAL eye. **Design** edits layers. **Present** fills the screen. **Enable Audio** asks for the microphone and maps the signal onto the design. If the browser has no Web Audio API or no microphone, the eye still renders and the status bar explains why.
+
+```bash
+npm run build
+npm run preview
+```
+
+## Screenshots
+
+Design mode, with the default seven-layer eye:
+
+![HAL Lens Studio in design mode](docs/screenshots/studio-design.png)
+
+Present mode:
+
+![HAL eye in present mode](docs/screenshots/studio-present.png)
+
+The same design when microphone capture is unavailable. The canvas stays up, and the control reports that live audio cannot start:
+
+![Studio still rendering without a microphone](docs/screenshots/studio-audio-unavailable.png)
+
+![Animated default HAL eye](public/loop_v1.gif)
+
+Agent operations, the live fleet console at `/`:
+
+![HAL agent operations console](docs/screenshots/operations.png)
+
+## Features
+
+- **Layer composer** for shapes, gradients, images, equalizer rings, radial text, and effects, with visibility, order, opacity, blend, and transform controls.
+- **Default HAL eye** so a new session already has a complete lens design.
+- **Design and present modes**, including keyboard shortcuts (`Ctrl+1` present, `Ctrl+2` design).
+- **Microphone-reactive visuals.** Volume, bass, mid, treble, and beat can drive layer properties through the equalizer pipeline.
+- **Graceful audio fallback.** Missing Web Audio, a missing microphone, or a denied permission leaves the design interactive and shows a plain-language reason. Alert tones in the operations console fail the same way.
+- **Saved designs.** Save, load, export, and import presets. Layer metadata stays in `localStorage`; image bytes stay in IndexedDB.
+- **Radial symmetry** for equalizer rings, including mirror and n-fold layouts.
+- **Frost Glass themes.** The interface uses the Frost Glass CSS library in frost-dark and frost-light.
+- **Agent operations console** for fleet identity, a semantic lens, a bounded cognition stream, an attention queue, a five-minute trace, and optional desktop notifications.
+- **Live event bridge.** DOM events, `BroadcastChannel`, `window.HAL_AGENT_NOTIFICATIONS`, and an optional WebSocket. `npm run dev:live` starts the localhost Codex sidecar.
+
+## Agent operations
+
+The console starts in labeled simulation mode and can be paused from the top bar. **Lens Studio** in the header opens the visual designer. **Operations** in the studio bar returns to the console.
+
+For real Codex session telemetry:
 
 ```bash
 npm run dev:live
 ```
 
-The sidecar binds `127.0.0.1:8765`, accepts the exact local Vite origins, and by
-default includes only sessions whose `cwd` matches the repository where it was
-started. Override that filter with `HAL_WORKSPACE=/absolute/path`. The bridge is
-intentionally read-only: operator commands receive a correlated rejection
-rather than controlling a Codex process without an explicit command adapter.
-
-To attach a WebSocket event source:
+The sidecar binds `127.0.0.1:8765`, accepts the local Vite origins, and by default includes only sessions whose `cwd` matches the repository where it was started. Override that filter with `HAL_WORKSPACE=/absolute/path`. The bridge is read-only: operator commands receive a correlated rejection rather than controlling a Codex process without an explicit command adapter.
 
 ```dotenv
 VITE_HAL_AGENT_WS_URL=ws://127.0.0.1:8765/hal-agent-events
 ```
 
-See [Agent Event Bridge](docs/agent-event-bridge.md) for the canonical event
-payload, inbound transports, outbound command channel, validation behavior, and
-security boundaries.
-
-## Integration surfaces
+See [Agent Event Bridge](docs/agent-event-bridge.md) for the event payload, transports, validation, and security boundaries.
 
 | Surface | Direction | Name |
 | --- | --- | --- |
@@ -90,12 +91,16 @@ security boundaries.
 | Window API | Both | `window.HAL_AGENT_NOTIFICATIONS` |
 | WebSocket | Both | `VITE_HAL_AGENT_WS_URL` |
 
-Inbound WebSocket messages are one event or an array of events. Outbound
-commands use `{ "type": "agent.command", "command": { ... } }`. Live socket
-connections automatically stop the demo stream so simulated and real activity
-cannot be confused. If the live socket drops, resuming the simulation restores
-the demo fleet, and a top-bar reconnect control re-attaches the live stream
-once the bridge is back.
+Inbound WebSocket messages are one event or an array of events. Outbound commands use `{ "type": "agent.command", "command": { ... } }`. A live socket stops the demo stream. If the socket drops, resuming the simulation restores the demo fleet, and the top-bar reconnect control attaches the live stream again.
+
+## Static demo
+
+`npm run build` writes a static site to `dist/`.
+
+- **Vercel:** [`vercel.json`](vercel.json) builds the Vite app and rewrites client routes to `index.html`. The base path stays `/`.
+- **GitHub Pages:** [`.github/workflows/pages.yml`](.github/workflows/pages.yml) builds with `VITE_BASE_PATH=/<repository>/`, copies `index.html` to `404.html` for client-side routes, and publishes the `dist` directory. Enable Pages with the GitHub Actions source after this workflow is on `master`.
+
+Pull requests run [`.github/workflows/ci.yml`](.github/workflows/ci.yml), which typechecks, lints, tests, builds, and uploads the `dist` artifact.
 
 ## Quality commands
 
@@ -109,8 +114,14 @@ npm run build
 
 ## Stack
 
-React 18, TypeScript, Vite, Lucide React, Jest, Testing Library, Canvas/Web Audio.
+React 19, TypeScript 6, Vite 8, Jest 30, Testing Library, and the Web Audio API.
+
+TypeScript 7 and ESLint 10 are published, but the current typescript-eslint release only accepts TypeScript below 6.1, ts-jest only accepts TypeScript below 7, and eslint-plugin-react 7.37 only accepts ESLint 9. This repo uses the newest versions those tools can actually run: TypeScript 6.0 and ESLint 9.39.
+
+## Attribution
+
+The interface is built with [Frost Glass CSS](https://github.com/frost-glass-css/frost-glass-css) by Frosty40, kept in `src/themes/frost-glass.css` under the MIT license.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 newjordan

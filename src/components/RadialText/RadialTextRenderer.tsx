@@ -69,7 +69,7 @@ export const RadialTextRenderer: React.FC<RadialTextRendererProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const charactersRef = useRef<RadialTextCharacter[]>([]);
   const effectProcessor = TextEffectProcessor.getInstance();
   const config = useMemo<RadialTextConfig>(() => {
@@ -477,7 +477,7 @@ export const RadialTextRenderer: React.FC<RadialTextRendererProps> = ({
       />
 
       {/* Performance indicator (development mode) */}
-      {process.env.NODE_ENV === 'development' && (
+      {typeof __HAL_DEV__ !== 'undefined' && __HAL_DEV__ && (
         <div
           className={`frost-absolute frost-top-2 frost-right-2 frost-text-xs ${theme === 'frost_light' ? 'frost-text-gray-600' : 'frost-text-gray-400'}`}
         >

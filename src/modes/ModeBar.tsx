@@ -1,4 +1,5 @@
 import { useMode, AppMode } from './ModeContext';
+import { publicUrl } from '../utils/publicUrl';
 
 interface ModeOption {
   mode: AppMode;
@@ -128,6 +129,18 @@ export function ModeBar({ className = '' }: ModeBarProps) {
       ))}
 
       <div style={{ flex: 1 }} />
+
+      <a
+        href={publicUrl('')}
+        style={{
+          marginRight: 12,
+          fontSize: 12,
+          color: 'rgba(255, 255, 255, 0.55)',
+          textDecoration: 'none',
+        }}
+      >
+        Operations
+      </a>
 
       <span
         style={{

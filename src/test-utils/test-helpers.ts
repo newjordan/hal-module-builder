@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+
 // Test helper utilities for common testing patterns
 
 import { render, RenderOptions, RenderResult } from '@testing-library/react';

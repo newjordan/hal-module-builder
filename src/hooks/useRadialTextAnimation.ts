@@ -104,7 +104,7 @@ export function useRadialTextAnimation(
   audioData?: Float32Array
 ): UseRadialTextAnimationResult {
   const animationService = RadialTextAnimationService.getInstance();
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const startTimeRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   const configRef = useRef<UseRadialTextAnimationConfig>(initialConfig);

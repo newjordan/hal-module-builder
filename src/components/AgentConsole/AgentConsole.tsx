@@ -34,6 +34,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
+import { publicUrl } from '../../utils/publicUrl';
 import {
   type CSSProperties,
   type ReactNode,
@@ -287,12 +288,15 @@ function Header({
     <header className='ops-header'>
       <div className='ops-brand'>
         <div className='ops-brand__mark' aria-hidden='true'>
-          <img src='/hal_lens_1.png' alt='' />
+          <img src={publicUrl('hal_lens_1.png')} alt='' />
         </div>
         <div>
           <strong>HAL</strong>
           <span>Agent Operations</span>
         </div>
+        <a className='ops-studio-link' href={publicUrl('studio')}>
+          Lens Studio
+        </a>
       </div>
 
       <div className='ops-header__metrics' aria-label='Fleet summary'>
@@ -668,7 +672,7 @@ function AgentLens({ agent, now }: { agent: Agent; now: number }) {
           <div className='lens-ring lens-ring--context' />
           <div className='lens-ring lens-ring--ticks' />
           <div className='lens-core'>
-            <img src='/hal_lens_1.png' alt='' aria-hidden='true' />
+            <img src={publicUrl('hal_lens_1.png')} alt='' aria-hidden='true' />
             <span className='lens-core__signal' />
             <span className='lens-core__scan' />
           </div>

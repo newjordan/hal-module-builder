@@ -77,7 +77,25 @@ export class AudioProcessor {
       return; // Already initialized
     }
 
-    this.audioContext = new AudioContext();
+    const AudioContextCtor =
+      globalThis.AudioContext ??
+      (globalThis as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioContextCtor) {
+      throw new Error(
+        'Web Audio API is not available in this browser. The design still renders without live audio.'
+      );
+    }
+
+    try {
+      this.audioContext = new AudioContextCtor();
+    } catch (error) {
+      this.audioContext = null;
+      const detail = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Web Audio API is not available: ${detail}. The design still renders without live audio.`
+      );
+    }
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = this.fftSize;
     this.analyser.smoothingTimeConstant = this.smoothingTimeConstant;
@@ -92,6 +110,12 @@ export class AudioProcessor {
    * Connect to microphone input
    */
   async connectMicrophone(): Promise<void> {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error(
+        'Microphone capture is not available in this browser. The design still renders without live audio.'
+      );
+    }
+
     if (!this.audioContext || !this.analyser) {
       await this.initialize();
     }

@@ -119,6 +119,15 @@ function AppShell({
   );
 }
 
+function routerBasename(): string {
+  const base =
+    typeof __HAL_BASE_URL__ === 'string' && __HAL_BASE_URL__.length > 0
+      ? __HAL_BASE_URL__
+      : '/';
+  if (base === '/') return '/';
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
 function App() {
   const [theme, setTheme] = useState<'frost_light' | 'frost_dark'>(
     'frost_dark'
@@ -204,7 +213,7 @@ function App() {
         console.error('App Error Context:', error, errorInfo);
       }}
     >
-      <Router>
+      <Router basename={routerBasename()}>
         <Routes>
           <Route path='/' element={<AgentConsole />} />
           <Route

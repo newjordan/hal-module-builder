@@ -104,6 +104,25 @@
   width: 250px;
 }
 
+.ops-studio-link {
+  margin-left: 12px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ops-studio-link:hover,
+.ops-studio-link:focus-visible {
+  border-color: rgba(255, 140, 70, 0.7);
+  outline: none;
+}
+
 .ops-brand {
   align-items: center;
   display: flex;

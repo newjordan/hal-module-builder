@@ -113,7 +113,7 @@ export const EqualizerEngine: React.FC<EqualizerEngineProps> = ({
 
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const audioDataRef = useRef<number[]>([]);
   const [visualizationLib, setVisualizationLib] =
     useState<VisualizationLibrary | null>(null);

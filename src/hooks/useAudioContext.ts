@@ -17,6 +17,10 @@ import {
   createEmptyAudioData,
   validateAudioData,
 } from '../utils/audio/audioProcessing';
+import {
+  detectAudioCapability,
+  isLiveAudioAvailable,
+} from '../utils/audio/audioCapability';
 
 /**
  * Hook configuration interface
@@ -52,10 +56,15 @@ export interface UseAudioContextReturn {
   toggleAudio: () => Promise<void>;
   /** Current audio context instance */
   audioContext: AudioContext | null;
-  /** Whether Web Audio API is supported */
+  /** Whether microphone-reactive audio can start */
   isSupported: boolean;
   /** Current error message if any */
   error: string | null;
+  /**
+   * Why live audio is off. Set when the browser lacks Web Audio or a
+   * microphone, and when starting capture fails. Null while audio can run.
+   */
+  unavailableReason: string | null;
 }
 
 /**
@@ -86,14 +95,12 @@ export const useAudioContext = (
   // Refs
   const audioManagerRef = useRef<AudioContextManager | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const frequencyProcessorRef = useRef<FrequencyProcessor | null>(null);
   const smoothedDataRef = useRef<number[]>(createEmptyAudioData(fftSize / 2));
 
-  // Check Web Audio API support
-  const isSupported = !!(
-    window.AudioContext || (window as any).webkitAudioContext
-  );
+  const capability = detectAudioCapability();
+  const isSupported = isLiveAudioAvailable(capability);
 
   // Handle state changes
   const handleStateChange = useCallback(
@@ -132,7 +139,10 @@ export const useAudioContext = (
   // Start audio visualization
   const startAudio = useCallback(async () => {
     if (!isSupported) {
-      const error = new Error('Web Audio API is not supported in this browser');
+      const error = new Error(
+        capability.reason ??
+          'Live audio is unavailable in this browser. The design still renders.'
+      );
       setError(error.message);
       onError?.(error);
       return;
@@ -215,6 +225,7 @@ export const useAudioContext = (
     }
   }, [
     isSupported,
+    capability.reason,
     fftSize,
     layers,
     defaultResponseSpeed,
@@ -288,6 +299,7 @@ export const useAudioContext = (
     audioContext,
     isSupported,
     error,
+    unavailableReason: error ?? capability.reason,
   };
 };
 

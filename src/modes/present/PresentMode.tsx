@@ -3,6 +3,7 @@ import { HalComposite } from '../../components/HalComposite/HalComposite';
 import { Layer } from '../../types/layer-types';
 import { useMode } from '../ModeContext';
 import { useAudioContext } from '../../hooks/useAudioContext';
+import { presentAudioHint } from '../../utils/audio/audioCapability';
 
 interface PresentModeProps {
   layers: Layer[];
@@ -18,10 +19,13 @@ export function PresentMode({
   const { setMode } = useMode();
   const [size, setSize] = useState(400);
 
-  // Real microphone audio — same pipeline as Design mode
-  const { audioData, isActive, toggleAudio } = useAudioContext(layers, {
-    fftSize: 128,
-  });
+  // Real microphone audio — same pipeline as Design mode.
+  // Missing Web Audio or a microphone leaves the design on screen.
+  const { audioData, isActive, toggleAudio, isSupported, unavailableReason } =
+    useAudioContext(layers, {
+      fftSize: 128,
+    });
+  const hint = presentAudioHint(isSupported, isActive, unavailableReason);
 
   // Calculate optimal size based on viewport
   useEffect(() => {
@@ -37,8 +41,9 @@ export function PresentMode({
   }, []);
 
   const handleClick = useCallback(() => {
+    if (!isSupported) return;
     void toggleAudio();
-  }, [toggleAudio]);
+  }, [isSupported, toggleAudio]);
 
   const handleDoubleClick = useCallback(() => {
     if (onDoubleClick) {
@@ -119,11 +124,14 @@ export function PresentMode({
           fontSize: '12px',
           textAlign: 'center',
           pointerEvents: 'none',
-          opacity: isActive ? 0 : 1,
+          opacity: hint ? 1 : 0,
           transition: 'opacity 0.3s ease',
+          maxWidth: 420,
+          lineHeight: 1.4,
         }}
+        role='status'
       >
-        Click to activate • Double-click to edit
+        {hint}
       </div>
 
       {/* CSS for pulse animation */}

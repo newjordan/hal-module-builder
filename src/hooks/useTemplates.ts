@@ -111,7 +111,7 @@ export const useTemplates = (
   const [storageStats, setStorageStats] = useState(() => getStorageStats());
 
   // Refs
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout>();
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Stable instance of TemplateValidationService for structural checks
   const templateValidationRef = useRef<TemplateValidationService | null>(null);
   if (!templateValidationRef.current) {
